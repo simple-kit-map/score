@@ -6,4 +6,4 @@ The core plugin for skm
 * dash & double jump
 * misc listeners
 
-Depends on [Essentials](https://essentialsx.net/downloads.html) to query warp list, and [Playerkits2](https://github.com/Ajneb97/PlayerKits2) for kits. It'd be ideal to have make our own warp and kit in the future though.
+Depends on [Essentials](https://essentialsx.net/downloads.html) to query warp list, and [PlayerKits2](https://github.com/Ajneb97/PlayerKits2) for kits. It'd be ideal to have make our own warp and kit in the future though.

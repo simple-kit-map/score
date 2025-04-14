@@ -1,5 +1,6 @@
 .gradle/
 gradle/
+target/
 
 # User-specific stuff
 .idea/
