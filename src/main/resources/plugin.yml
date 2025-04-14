@@ -1,0 +1,21 @@
+name: score
+version: '1.0-SNAPSHOT'
+main: cx.ctt.skm.score.Score
+api-version: '1.21'
+depend: [Essentials, PlayerKits2]
+libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20']
+
+commands:
+    dash:
+      description: dash in your direction
+    hide:
+      description: hide player
+    duel:
+      description: duel someone
+      aliases: [d]
+    doublejump:
+      description: double jump to leap
+      aliases: [dj]
+    knockback:
+      description: set your knockback
+      aliases: [kb]
