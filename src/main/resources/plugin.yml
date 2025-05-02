@@ -6,6 +6,9 @@ depend: [Essentials, PlayerKits2]
 libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20']
 
 commands:
+    build:
+      description: toggle being able to build
+      aliases: [bu]
     dash:
       description: dash in your direction
     hide:
