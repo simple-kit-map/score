@@ -9,7 +9,10 @@ import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.potion.PotionEffect
 import java.util.UUID
 import kotlin.collections.HashMap
-
+/*
+* https://github.com/GavvyDizzle/PersistentEffects
+* https://www.spigotmc.org/resources/persistenteffects.106587/
+*/
 class DeathHandler(private val plugin: Score) : Listener {
     private val playerEffects = HashMap<UUID, Collection<PotionEffect>>()
 
