@@ -1,6 +1,7 @@
 package cx.ctt.skm.score.commands
 
 import cx.ctt.skm.score.Score
+import net.md_5.bungee.api.ChatColor.*
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.command.Command
@@ -33,10 +34,10 @@ class BuildCommand (private val plugin: Score): Listener, CommandExecutor {
     private fun togglePlayer(player: Player){
         if (player !in activated){
             activated.add(player)
-            player.sendMessage("Build mode ON, you can now build")
+            player.sendMessage("Build mode ${GREEN}ON$RESET, you can now build")
         } else {
             activated.remove(player)
-            player.sendMessage("Build mode OFF, you can no longer build")
+            player.sendMessage("Build mode ${RED}OFF$RESET, you can no longer build")
         }
     }
 
