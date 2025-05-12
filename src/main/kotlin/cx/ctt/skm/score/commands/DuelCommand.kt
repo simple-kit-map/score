@@ -25,13 +25,16 @@ data class DuelInformation(
     val kit: String,
     val knockback: String,
     val initiator: Player,
-    val invitees: List<Player>,
+    val invitees: MutableList<Player>,
     var started: Boolean
 )
 
 class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Listener {
 
-    private var duels: HashMap<UUID, DuelInformation> = HashMap()
+    companion object {
+        var duels: HashMap<UUID, DuelInformation> = HashMap()
+    }
+
     private var guiCallbacks: HashMap<UUID, Consumer<InventoryClickEvent>> = HashMap()
     private var closeCallbacks: HashMap<UUID, Runnable> = HashMap()
     // args to do:
@@ -43,7 +46,7 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
 
         if (args.isEmpty()){
-            sender.sendMessage("/duel <player> <kit> <map> [mechanic]")
+            sender.sendMessage("/duel <player> <kit> <map>")
             return true
         }
         val players = Bukkit.getOnlinePlayers()
@@ -54,9 +57,8 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
         var knockback: String? = null
         for (arg in args){
             when (arg.lowercase()) {
-                sender.name.lowercase() -> {
-                    continue
-                }
+                sender.name.lowercase() -> continue
+
                 in igns.map { it.lowercase() } -> {
                     val player = Bukkit.getPlayer(arg) ?: run {
                         sender.sendMessage("Failed getting online player $arg")
@@ -64,12 +66,16 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
                     }
                     playersToDuel.add(player)
                 }
-                in plugin.essentials.warps.list.map { it.lowercase() } -> warp = arg
+//                in plugin.getWarps().map { it.lowercase() } -> warp = arg
+                in WarpCommand.getWarpNamesRecursively(plugin.config.getConfigurationSection("warps")!!) -> warp = arg
+
+//                in listOf("soccer", "spawn").map { it.lowercase() } -> warp = arg
                 in plugin.config.getConfigurationSection("old-player-knockback.custom.configs")?.getKeys(false)!! -> knockback = arg
-                in plugin.playerKitsAPI.getKitsManager().kits.map { it.name.lowercase() } -> kit = arg
-                else -> {
-                    sender.sendMessage("Skipping unknown ign/kit/map/kb `$arg`")
-                }
+
+//                in plugin.playerKitsAPI.getKitsManager().kits.map { it.name.lowercase() } -> kit = arg
+                in plugin.config.getConfigurationSection("kits")?.getKeys(false)!! -> kit = arg
+
+                else -> sender.sendMessage("Skipping unknown ign/kit/map/kb `$arg`")
             }
         }
 //        }
@@ -114,12 +120,26 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
             gui.setItem(slot, item)
         }
 
-        sender.openInventory(gui)
+//        sender.openInventory(gui)
         guiCallbacks[sender.uniqueId] = Consumer {
             sender.sendMessage("You clicked an item!")
             guiCallbacks.remove(sender.uniqueId)
             closeCallbacks.remove(sender.uniqueId)
         }
+//        guiCallbacks.put(sender.getUniqueId(), Any { event ->
+//            player.sendMessage("You clicked an item!")
+//            // remove callback after use
+//            guiCallbacks.remove(player.getUniqueId())
+//            closeCallbacks.remove(player.getUniqueId())
+//        })
+//
+//
+//        // Set up close handler
+//        closeCallbacks.put(player.getUniqueId(), Any {
+//            player.sendMessage("You closed the GUI.")
+//            guiCallbacks.remove(player.getUniqueId())
+//            closeCallbacks.remove(player.getUniqueId())
+//        })
         val duelID = UUID.randomUUID()
         duels[duelID] = DuelInformation(
             warp!!,
@@ -187,13 +207,16 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
         val onlineNames = Bukkit.getOnlinePlayers()
             .filter { !it.name.equals(sender.name, true) }
             .map { it.name }
-        val warps = plugin.essentials.warps.list
+//        val warps = listOf("soccer", "spawn")// plugin.getWarps()
+        val warps = plugin.config.getConfigurationSection("warps")!!.getKeys(false)
         val knockbacks = plugin.config.getConfigurationSection("old-player-knockback.custom.configs")?.getKeys(false)!!
-        val kits = plugin.playerKitsAPI.getKitsManager().kits.map { it.name }
+//        val kits = plugin.playerKitsAPI.getKitsManager().kits.map { it.name }
+        val kits = plugin.config.getConfigurationSection("kits")?.getKeys(false)!!
+//        val kits = listOf("nd", "boxing")
 
         val suggestions: MutableList<String> = ArrayList()
 
-        if (args.size == 0) {
+        if (args.isEmpty()) {
             return onlineNames
         }
 
@@ -243,5 +266,26 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
         }
 
         return suggestions
+//        Bukkit.getLogger().info("Tab complete called with args: ${args.joinToString()}")
+//
+//        val onlineNames = Bukkit.getOnlinePlayers()
+//            .filter { !it.name.equals(sender.name, true) }
+//            .map { it.name }
+//
+//        val warpNames = plugin.essentials.warps.list
+//
+//        return when {
+//            args.isEmpty() -> onlineNames
+//
+//            args.size == 1 -> onlineNames
+//                .filter { it.startsWith(args[0], ignoreCase = true) }
+//
+//            args.size >= 2 -> onlineNames
+//                .filter { it.startsWith(args.last(), ignoreCase = true) } +
+//                    warpNames
+//                .filter { it.startsWith(args.last(), ignoreCase = true) }
+//
+//            else -> emptyList()
+//        }
     }
 }

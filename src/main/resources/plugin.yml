@@ -2,10 +2,20 @@ name: score
 version: '1.0-SNAPSHOT'
 main: cx.ctt.skm.score.Score
 api-version: '1.21'
-depend: [Essentials, PlayerKits2]
+softdepend: [Essentials, PlayerKits2]
 libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20']
 
 commands:
+
+    playerstatus:
+      description: get information about online players
+      aliases: [ps, pstatus]
+    kit:
+      description: claim an inventory/armor/effect loadout
+      aliases: [k, kits, setkit, kit-s]
+    warp:
+      description: teleport to a point of interest
+      aliases: [w, warps, setwarp, warp-s]
     build:
       description: toggle being able to build
       aliases: [bu]
@@ -16,9 +26,14 @@ commands:
     duel:
       description: duel someone
       aliases: [d]
+    accept:
+      description: accept a duel
     doublejump:
       description: double jump to leap
       aliases: [dj]
     knockback:
       description: set your knockback
       aliases: [kb]
+    ping:
+      description: get your latency
+      aliases: [ms, latency]
