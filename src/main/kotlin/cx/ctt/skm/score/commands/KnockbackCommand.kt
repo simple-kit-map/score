@@ -1,4 +1,5 @@
 package cx.ctt.skm.score.commands
+
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.chat.ClickEvent
 import net.md_5.bungee.api.chat.HoverEvent
@@ -15,12 +16,15 @@ import java.util.*
 enum class KB_NEW {
     new, create, add
 }
+
 enum class KB_DEL {
     remove, rm, delete, del
 }
+
 enum class KB_LIST {
     list, l, ls
 }
+
 enum class KB_SET {
     set, select, choose, pick, switch
 }
@@ -30,18 +34,18 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
 
         var args = args.map { it.lowercase() }.toMutableList()
 
-        val uuid = if (sender !is Player){
+        val uuid = if (sender !is Player) {
             Bukkit.getOfflinePlayer(args.removeAt(1)).uniqueId
         } else {
             sender.uniqueId
         }
 
         val presets = plugin.config.getConfigurationSection("old-player-knockback.custom.configs")?.getKeys(false)
-        if (!presets.isNullOrEmpty() && args.size == 1 && args[0] in presets){
+        if (!presets.isNullOrEmpty() && args.size == 1 && args[0] in presets) {
             args = listOf("set", args[0]).toMutableList()
         }
-        if (args.size == 2 && args[0] in KB_DEL.entries.map { it.name }){
-            if (sender.hasPermission("deleteotherskb")){
+        if (args.size == 2 && args[0] in KB_DEL.entries.map { it.name }) {
+            if (sender.hasPermission("deleteotherskb")) {
                 val path = "old-player-knockback.custom.configs." + args[1]
                 sender.sendMessage("deleted $path")
                 plugin.config.set(path, null)
@@ -49,25 +53,25 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
             }
             return true
         }
-        if (args.size > 0 && args[0] in KB_NEW.entries.map { it.name }){
+        if (args.size > 0 && args[0] in KB_NEW.entries.map { it.name }) {
             args.removeAt(0)
         }
 
 
-        if (args.size == 8 || args.size == 7 || args.size == 9){
+        if (args.size == 8 || args.size == 7 || args.size == 9) {
 
             val path = "old-player-knockback.custom.configs.${args[0]}"
-            plugin.config.set("$path.values.friction",         args[1].toDouble())
-            plugin.config.set("$path.values.horizontal",       args[2].toDouble())
-            plugin.config.set("$path.values.vertical",         args[3].toDouble())
-            plugin.config.set("$path.values.verticallimit",    args[4].toDouble())
-            plugin.config.set("$path.values.extrahorizontal",  args[5].toDouble())
-            plugin.config.set("$path.values.extravertical",    args[6].toDouble())
-            if (args.size == 8 && args[7].isNotEmpty() && args[7] == "true"){
-                plugin.config.set("$path.values.netheriteKnockbackResistance",  args[7].toDouble())
+            plugin.config.set("$path.values.friction", args[1].toDouble())
+            plugin.config.set("$path.values.horizontal", args[2].toDouble())
+            plugin.config.set("$path.values.vertical", args[3].toDouble())
+            plugin.config.set("$path.values.verticallimit", args[4].toDouble())
+            plugin.config.set("$path.values.extrahorizontal", args[5].toDouble())
+            plugin.config.set("$path.values.extravertical", args[6].toDouble())
+            if (args.size == 8 && args[7].isNotEmpty() && args[7] == "true") {
+                plugin.config.set("$path.values.netheriteKnockbackResistance", args[7].toDouble())
             }
 
-            if (args.size == 9 && args[8].isNotEmpty()){
+            if (args.size == 9 && args[8].isNotEmpty()) {
                 plugin.config.set("$path.values.hitdelay", args[8].toInt())
             }
             val valueDisplay = args.slice(1..args.lastIndex).joinToString(" ")
@@ -75,19 +79,19 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
 
             val keys = plugin.config.getConfigurationSection(path)?.getKeys(false)
 
-            if (!keys?.contains("created")!!){
-                plugin.config.set("$path.created" , System.currentTimeMillis())
+            if (!keys?.contains("created")!!) {
+                plugin.config.set("$path.created", System.currentTimeMillis())
             }
-            if (!keys.contains("creatorUUID")){
-                plugin.config.set("$path.creatorUUID" , uuid.toString())
+            if (!keys.contains("creatorUUID")) {
+                plugin.config.set("$path.creatorUUID", uuid.toString())
             }
             args = listOf("select", args[0]).toMutableList()
         }
-        if (args.size == 2 && args[0] == "show"){
+        if (args.size == 2 && args[0] == "show") {
             sender.sendMessage("${args[1]} is using preset ${plugin.config.getString("old-player-knockback.custom.selection.${args[1]}")}")
         }
 
-        if (args.size == 2 && args[0] == "get"){
+        if (args.size == 2 && args[0] == "get") {
             val targetkb = plugin.config.getString("old-player-knockback.custom.selection.${args[1]}")
 
             plugin.config.set("old-player-knockback.custom.selection.$uuid", targetkb)
@@ -107,7 +111,7 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
             p.noDamageTicks = hitDelay
             p.maximumNoDamageTicks = hitDelay
 
-            if (!plugin.config.contains(selectedKb)){
+            if (!plugin.config.contains(selectedKb)) {
                 sender.sendMessage("Knockback preset $knockback does not exist")
                 return false
             }
@@ -117,24 +121,24 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
 
             val previousPreset = plugin.config.getString(selectionPath)
 
-            val previousString = if (previousPreset.isNullOrEmpty()){
+            val previousString = if (previousPreset.isNullOrEmpty()) {
                 "Applied ${args[1]}, NOTE: this preset only applies to the knockback you'll be taking"
             } else {
-                if (previousPreset.equals(args[1], true)){
+                if (previousPreset.equals(args[1], true)) {
                     "Already using preset ${args[1]}"
                 } else {
                     "Switched from $previousPreset to $knockback"
                 }
             }
             val message = TextComponent(previousString)
-            message.clickEvent = ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/kb create ${sender.name}s$knockback $valuesDisplay")
+            message.clickEvent =
+                ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/kb create ${sender.name}s$knockback $valuesDisplay")
             sender.spigot().sendMessage(message)
 
 
             val claim = TextComponent("${GRAY}[${GREEN}Click to switch${GRAY}]")
             var hover = "$knockback\n"
-            for(key in plugin.config.getConfigurationSection("${selectedKb}.values")?.getKeys(false)!!
-            ){
+            for (key in plugin.config.getConfigurationSection("${selectedKb}.values")?.getKeys(false)!!) {
                 hover += "$key: ${plugin.config.get("${selectedKb}.values.$key")}\n"
             }
             hover += "Click to switch"
@@ -165,7 +169,7 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
             args = listOf("list").toMutableList()
         }
 
-        if (args.size == 1 && args[0] in KB_LIST.entries.map { it.name }){
+        if (args.size == 1 && args[0] in KB_LIST.entries.map { it.name }) {
 
             val section = plugin.config.getConfigurationSection("old-player-knockback.custom.configs")
             if (section == null) {
@@ -180,10 +184,10 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
             sender.sendMessage("")
             sender.sendMessage("Available knockbacks (click to set)")
             sender.sendMessage("")
-            for (knockback in section.getKeys(false)){
+            for (knockback in section.getKeys(false)) {
                 val config = plugin.config.getConfigurationSection("old-player-knockback.custom.configs.$knockback")
 
-                if (config == null || config.getKeys(false).size == 0){
+                if (config == null || config.getKeys(false).size == 0) {
                     continue
                 }
 
@@ -199,15 +203,13 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
                 message.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kb set $knockback");
 
                 var hover = "$knockback\n"
-                for(key in config.getConfigurationSection("values")?.getKeys(false)!!
-                ){
+                for (key in config.getConfigurationSection("values")?.getKeys(false)!!) {
                     hover += "$key: ${config.get("values.$key")}\n"
                 }
                 hover += "Click to switch"
 
                 message.hoverEvent = HoverEvent(
-                    HoverEvent.Action.SHOW_TEXT,
-                    arrayOf(TextComponent(hover))
+                    HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent(hover))
                 )
 
                 sender.spigot().sendMessage(message)
@@ -219,10 +221,7 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
     }
 
     override fun onTabComplete(
-        sender: CommandSender,
-        command: Command,
-        label: String,
-        args: Array<out String>
+        sender: CommandSender, command: Command, label: String, args: Array<out String>
     ): List<String> {
 
         sender.sendMessage(args.toString())
@@ -233,17 +232,20 @@ class KnockbackCommand (private val plugin: Score) : CommandExecutor, TabComplet
                 val configs = mutableListOf("list", "set", "add")
 
                 configs.addAll(
-                    (plugin.config.getConfigurationSection("old-player-knockback.custom.configs")
-                        ?.getKeys(false)!!))
+                    (plugin.config.getConfigurationSection("old-player-knockback.custom.configs")?.getKeys(false)!!)
+                )
 
                 return configs.filter { it.startsWith(args[0]) }
             }
+
             2 -> {
                 return listOf("two!!")
             }
+
             3 -> {
                 return listOf("three!!")
             }
+
             else -> return Collections.emptyList()
         }
     }
