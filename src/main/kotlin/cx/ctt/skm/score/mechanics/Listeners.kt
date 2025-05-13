@@ -12,6 +12,7 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
+import org.bukkit.event.block.LeavesDecayEvent
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.ProjectileHitEvent
@@ -50,6 +51,11 @@ class Listeners (private val plugin: Score): Listener {
 //            }
 //        }
 //    }
+
+    @EventHandler
+    fun onLeavesDecay(event: LeavesDecayEvent) {
+        event.isCancelled = true
+    }
 
     @EventHandler
     fun onBreakCrop(e: PlayerInteractEvent) {
