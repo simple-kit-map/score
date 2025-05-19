@@ -24,7 +24,7 @@ dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT")
     implementation("net.essentialsx:EssentialsX:2.21.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation(files("..\\PlayerKits2\\target\\PlayerKits2-1.0-SNAPSHOT.jar"))
 }
 
