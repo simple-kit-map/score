@@ -4,6 +4,7 @@ import cx.ctt.skm.score.MainMenu
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.ChatColor.*
 import net.md_5.bungee.api.chat.ClickEvent
+import net.md_5.bungee.api.chat.HoverEvent
 import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -17,6 +18,7 @@ import org.bukkit.entity.Player
 import org.bukkit.event.Listener
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import java.util.*
 
 
@@ -55,12 +57,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                         val id = UUID.fromString(it)
                         var authorName = (Bukkit.getPlayer(id) ?: Bukkit.getOfflinePlayer(id)).name
                         authorName = if (authorName == player.name) "${RED}you" else "${DARK_PURPLE}$authorName"
-                        lore.addAll(
-                            mutableListOf(
-                                "${LIGHT_PURPLE}by $authorName",
-                                "${LIGHT_PURPLE}to ${RED}delete ${LIGHT_PURPLE}it, press ${DARK_PURPLE}CTRL+{Drop key}"
-                            )
-                        )
+                        lore.add("${LIGHT_PURPLE}by $authorName")
                     }
 
                     lore.add("$DARK_GRAY/k ${kit.lowercase()}")
@@ -75,10 +72,11 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
 
 
         /** helo i give you player i fill his inv and yap abt it :) **/
-        fun loadKit(plugin: Score, player: Player, name: String, label: String): Boolean {
+        fun loadKit(plugin: Score, player: Player, name: String, label: String = "kit"): Boolean {
 
-            val kit = plugin.config.getConfigurationSection("kits.$name") ?: error("Failed getting kit $name")
-            plugin.PlayerStatuses[player]?.kit = name
+            val kitName = name.split(".")[0]
+            val kit = plugin.config.getConfigurationSection("kits.$kitName") ?: error("Failed getting kit $name")
+            plugin.config.set("status.${player.uniqueId}.kit", name)
             kit["uses"] = kit.getInt("uses") + 1
 
 //        val armors = kit.get("armor")!!
@@ -102,14 +100,16 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
             player.activePotionEffects.forEach { player.removePotionEffect(it.type) }
             kit.getList("effects")!!.forEach { player.addPotionEffect(it as PotionEffect) }
 
-            if (label == "kit-s") {
-                val msg = TextComponent("$DARK_GRAY${player.name} followed")
-                msg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit-s $name")
+            if (label == "kit-f") {
+                val msg = TextComponent("$DARK_GRAY${player.name.lowercase()}.$name")
+                msg.hoverEvent =
+                    HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${DARK_GRAY}kit $name")))
+                msg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit-f $name")
                 Bukkit.spigot().broadcast(msg)
-            } else {
+            } else if (label != "kit-s") {
                 val msg = TextComponent("$DARK_PURPLE* ${player.name} ${LIGHT_PURPLE}switched to ${DARK_PURPLE}kit ")
                 val claimButton = TextComponent("$GRAY[$GREEN$name$GRAY]")
-                claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit-s $name")
+                claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit-f $name")
                 msg.addExtra(claimButton)
                 Bukkit.spigot().broadcast(msg)
             }
@@ -131,7 +131,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
             var unsafeItems = kit.get(key)
             if (unsafeItems is MemorySection) {
                 unsafeItems = unsafeItems.getValues(true)
-            } else if (unsafeItems !is HashMap<*, *>){
+            } else if (unsafeItems !is HashMap<*, *>) {
                 error("${kit.name} inventory is not a hashmap")
             }
             val items = unsafeItems as HashMap<String, ItemStack>
@@ -166,10 +166,15 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
 
         fun previewKit(plugin: Score, player: Player, name: String): Boolean {
             val kit = plugin.config.getConfigurationSection("kits.$name")!!
-            val authorId = UUID.fromString(kit.getString("author"))
-            val author = Bukkit.getPlayer(authorId) ?: Bukkit.getOfflinePlayer(authorId)
+            val authorIdString = kit.getString("creator")
+            val author = if (authorIdString == null) {
+                "Unknown"
+            } else {
+                val authorId = UUID.fromString(authorIdString)
+                (Bukkit.getPlayer(authorId) ?: Bukkit.getOfflinePlayer(authorId)).name ?: "Someone"
+            }
 
-            val title = "${LIGHT_PURPLE}Kit $DARK_PURPLE$name ${LIGHT_PURPLE}by ${DARK_PURPLE}${author.name}"
+            val title = "${LIGHT_PURPLE}Kit $DARK_PURPLE$name ${LIGHT_PURPLE}by ${DARK_PURPLE}${author}"
             val inv = Bukkit.createInventory(null, 54, title)
 
             inv.clear()
@@ -203,7 +208,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                 meta.setDisplayName("${RESET}${LIGHT_PURPLE}Potion Effects:")
                 for (effect in effects as Collection<PotionEffect>) {
                     val duration = if (effect.isInfinite || effect.duration == -1) "ထ" else effect.duration.toString()
-                    val amplifier = if (effect.amplifier > 250) "MAX" else intToRoman(effect.amplifier)
+                    val amplifier = if (effect.amplifier > 250) "MAX" else intToRoman(effect.amplifier + 1)
                     val hidden = if (effect.hasParticles()) "" else "$DARK_GRAY*"
                     text.add("$RESET$LIGHT_PURPLE${effect.type.name.lowercase()}$DARK_PURPLE$hidden $amplifier$LIGHT_PURPLE: $DARK_PURPLE$duration")
 
@@ -218,7 +223,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
             if (itemStacks[37] != null) inv.setItem(2, itemStacks[37])
             if (itemStacks[36] != null) inv.setItem(3, itemStacks[36])
 
-            val cSlots = (45-9..53-9) + (18-9..44-9) // map player.inventory.contents
+            val cSlots = (45 - 9..53 - 9) + (18 - 9..44 - 9) // map player.inventory.contents
             cSlots.zip(itemStacks).forEach { (slot, item) ->
                 if (item == null) inv.setItem(slot, ItemStack(Material.AIR))
                 else inv.setItem(slot, item)
@@ -272,27 +277,142 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
         if (args.isEmpty()) {
             return listKits(plugin, sender, true)
         }
+        val args = args.map { it.lowercase() }.toMutableList()
+
+        // this makes kb set <name> behave like kb <name>
+        if (args[0] in SET.entries.map { it.name }) {
+            args.removeAt(0)
+        }
+
+        val first = args[0]
         val kits = plugin.config.getConfigurationSection("kits")!!.getKeys(false)
-        when (val first = args[0]) {
+        if (args.size == 1) {
+            when (first) {
+                "clear" -> {
+                    if (sender is Player) {
+                        sender.inventory.clear()
+                        sender.inventory.helmet = null
+                        sender.inventory.chestplate = null
+                        sender.inventory.leggings = null
+                        sender.inventory.boots = null
+                        sender.activePotionEffects.clear()
+                    }
+                }
+
+                else -> {
+                    val kitClean = first.split(".")
+                    if (kitClean[0] !in kits) {
+                        return kitNotFound(sender, kitClean[0])
+                    }
+                    loadKit(plugin, sender as Player, first, label)
+                    if (kitClean.size == 1) {
+                        return true
+                    }
+                    // else, apply the following effects :D
+                    val modifiers = kitClean
+                    var skipFirst = true
+                    for (mod in modifiers) {
+                        if (skipFirst) {
+                            skipFirst = false
+                            continue
+                        }
+
+                        val regex = Regex("([a-zA-Z]+)(\\d+)")
+                        val matchResult = regex.matchEntire(mod)
+
+                        val ret = matchResult?.destructured
+                        if (ret == null) {
+                            sender.sendMessage("Invalid format for kit modifier $mod")
+                            sender.sendMessage("Example: /kit nodebuff.speed7.sat1.fres0")
+                            sender.sendMessage("This gives you a kit with speed 7, saturation 1 and fire resistance removed")
+                            continue
+                        }
+                        val (effect, amplifierParsed) = ret
+
+                        val amplifier = amplifierParsed.toInt() - 1
+
+                        val effectType = when (effect) {
+                            "speed", "s" -> PotionEffectType.SPEED
+                            "str", "strength", "strenght", "st", "strong" -> PotionEffectType.STRENGTH
+                            "nv", "nightvision" -> PotionEffectType.NIGHT_VISION
+                            "jump", "jumpboost" -> PotionEffectType.JUMP_BOOST
+                            "res", "resistance", "boxing", "invincible" -> PotionEffectType.RESISTANCE
+                            "haste" -> PotionEffectType.HASTE
+                            "invis", "invisibility" -> PotionEffectType.INVISIBILITY
+                            "fres", "fireres", "fire", "fireresistance" -> PotionEffectType.FIRE_RESISTANCE
+                            "saturation", "sat", "satur", "infinitefood", "infinitehunger" -> PotionEffectType.SATURATION
+                            else -> {
+                                val closest = PotionEffectType.values().find {
+                                    sender.sendMessage(it.name)
+                                    it.name.equals(effect, true) }
+                                if (closest == null){
+                                    sender.sendMessage("Failed parsing effect $effect")
+                                    continue
+                                }
+                                closest
+                            }
+                        }
+                        sender.activePotionEffects.forEach {
+                            if (it.type.name.equals(mod.drop(2), true))
+                                sender.removePotionEffect(it.type)
+
+                            if (amplifier > -1)
+                                sender.addPotionEffect(
+                                    PotionEffect(
+                                        effectType,
+                                        -1,
+                                        amplifier,
+                                        false,
+                                        true
+                                    )
+                                )
+
+                        }
+
+                    }
+
+                }
+            }
+            return true
+        }
+
+
+
+        when (first) {
+            "setalias" -> {
+                if (args.size < 3) {
+                    sender.sendMessage("kit /setalias <kit> <alias1 alias2 ...>")
+                }
+                if (args[1] !in kits) {
+
+                }
+            }
+
             "delete", "del", "remove", "rm" -> {
                 if (args.size < 2) {
                     sender.sendMessage(help)
                     return true
                 }
                 val second = args[1]
-                kits.forEach {
-                    if (it.equals(second, true)) {
-                        plugin.config.set("kits.$second", null)
-                        plugin.saveConfig()
-                        return true
-                    }
+                val kitSect = plugin.config.getConfigurationSection("kits.$second")
+                if (kitSect == null) {
+                    return kitNotFound(sender, second)
+                } else {
+                    sender.sendMessage("${DARK_PURPLE}* Deleted ${LIGHT_PURPLE}kit $DARK_PURPLE$second")
+                    plugin.config.set("kits.$second", null)
+                    plugin.saveConfig()
+                    return true
                 }
-                return kitNotFound(sender, second)
             }
 
             "seticon" -> return set(sender as Player, args[1], sender.inventory.itemInMainHand.clone(), KitPart.ICON)
 
-            "seteffect", "seteffects" -> return set(sender as Player, args[1], sender.inventory.itemInMainHand.clone(), KitPart.POTIONEFFECTS)
+            "seteffect", "seteffects" -> return set(
+                sender as Player,
+                args[1],
+                sender.inventory.itemInMainHand.clone(),
+                KitPart.POTIONEFFECTS
+            )
 
             "list", "ls", "lists" -> return listKits(plugin, sender, false)
             "view", "preview", "pv" -> {
@@ -316,7 +436,23 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                     return true
                 }
                 val second = args[1]
-                val blacklist = mutableListOf("create", "new", "view", "preview", "pv")
+                val blacklist = mutableListOf(
+                    "create",
+                    "new",
+                    "view",
+                    "preview",
+                    "pv",
+                    "seticon",
+                    "seteffect",
+                    "seteffects",
+                    "list",
+                    "ls",
+                    "lists",
+                    "delete",
+                    "del",
+                    "remove",
+                    "rm"
+                )
                 blacklist.addAll(Bukkit.getOnlinePlayers().map { it.name })
                 blacklist.addAll(Bukkit.getOfflinePlayers().map { it.name!! })
                 if (blacklist.any { second.equals(it, true) }) {
@@ -325,17 +461,10 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                 }
 
                 if ((sender as Player).inventory.itemInMainHand.type != Material.AIR) {
-                    set(sender as Player, args[1], sender.inventory.itemInMainHand.clone())
+                    set(sender, args[1], sender.inventory.itemInMainHand.clone())
                 }
             }
 
-            else -> {
-                if (kits.any { first.equals(it, true) }) {
-                    loadKit(plugin, sender as Player, first, label)
-                } else {
-                    return kitNotFound(sender, first)
-                }
-            }
 
         }
         return true
@@ -353,11 +482,33 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
         when {
             args.isEmpty() -> return listOf("")
             args.size == 1 -> {
-                val first = mutableListOf("create", "preview", "pv", "setaliases", "seticon", "setalias", "setinv", "setinventory", "setarmor", "seteffects")
+                val first = mutableListOf(
+                    "create",
+                    "preview",
+                    "pv",
+                    "setaliases",
+                    "seticon",
+                    "setalias",
+                    "setinv",
+                    "setinventory",
+                    "setarmor",
+                    "seteffects"
+                )
                 first.addAll(kits)
                 return first.filter { it.startsWith(args[0], true) }
             }
-            args[0] in listOf("preview", "pv", "setaliases", "seticon", "setalias", "setinv", "setinventory", "setarmor", "seteffects") -> {
+
+            args[0] in listOf(
+                "preview",
+                "pv",
+                "setaliases",
+                "seticon",
+                "setalias",
+                "setinv",
+                "setinventory",
+                "setarmor",
+                "seteffects"
+            ) -> {
                 return kits.filter { it.startsWith(args[1], true) }
             }
         }
@@ -428,7 +579,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
     //    }
     */
 
-//    fun editPart(player: Player, name: String, part: KitPart): Boolean {
+    //    fun editPart(player: Player, name: String, part: KitPart): Boolean {
 //        val kit = plugin.config.getConfigurationSection("kits.$name")!!
 //        when (part) {
 //            KitPart.ARMOR -> {
@@ -516,7 +667,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                 .broadcast(TextComponent("$DARK_PURPLE* ${player.name} ${LIGHT_PURPLE}modified $DARK_PURPLE${part.name.lowercase()} ${LIGHT_PURPLE}of kit $name"))
             return true
         } else {
-            kit["author"] = player.uniqueId.toString()
+            kit["creator"] = player.uniqueId.toString()
             kit["uses"] = 0
             kit["created"] = System.currentTimeMillis()
             plugin.saveConfig()
