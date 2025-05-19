@@ -1,5 +1,6 @@
 package cx.ctt.skm.score.mechanics
 
+import cx.ctt.skm.score.Score
 import org.bukkit.Bukkit
 import org.bukkit.Effect
 import org.bukkit.GameMode
@@ -16,19 +17,25 @@ import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.event.player.PlayerToggleFlightEvent
 import org.bukkit.event.player.PlayerToggleSneakEvent
 import org.bukkit.util.Vector
-import cx.ctt.skm.score.Score
 
-class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
+/* This is based from an old plugin, class path started with net.thegamingcraft,
+   I couldn't find the original spigotmc.org resource pag
+*/
+class DoubleJump(private val plugin: Score) : CommandExecutor, Listener {
     private var cooldown: HashMap<Player, Boolean> = HashMap()
-    private var fixed: ArrayList<Player> = ArrayList()
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (sender !is Player) {
             return true
         }
-        var uuid = sender.uniqueId
+        val uuid = sender.uniqueId
 
-        if (args.isNotEmpty()){
+        if (args.isNotEmpty()) {
+            if (args[0] == "disable") {
+                if (sender.gameMode in listOf(GameMode.SURVIVAL, GameMode.ADVENTURE)) {
+                    sender.allowFlight = false
+                }
+            }
             plugin.config.set("doublejump.preferences.$uuid", args.joinToString(" "))
             plugin.saveConfig()
         } else {
@@ -46,17 +53,17 @@ class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
         if (e.cause == EntityDamageEvent.DamageCause.FALL && e.entity.type == EntityType.PLAYER) {
             val p = e.entity as Player
             val uuid = p.uniqueId
-            if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable")){
+            if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable", true)) {
                 return
             }
-            if (p.hasPermission("DJP.doubleJump") || p.hasPermission("DJP.groundPound")) {
-                e.isCancelled = true
-            }
-            if (!p.hasPermission("DJP.*") && !p.hasPermission("DJP.groundPound")) {
-                return
-            }
+//            if (p.hasPermission("DJP.doubleJump") || p.hasPermission("DJP.groundPound")) {
+            e.isCancelled = true
+//            }
+//            if (!p.hasPermission("DJP.*") && !p.hasPermission("DJP.groundPound")) {
+//                return
+//            }
             if (p.isSneaking) {
-                if (!plugin.config.getString("doublejump.preferences.$uuid").equals("disable particles")){
+                if (!plugin.config.getString("doublejump.preferences.$uuid").equals("disable particles", true)) {
                     val blocks = ArrayList<Block>()
                     blocks.add(p.world.getBlockAt(p.location.subtract(0.0, 1.0, 0.0)))
                     blocks.add(p.world.getBlockAt(p.location.subtract(1.0, 1.0, 0.0)))
@@ -70,13 +77,9 @@ class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
                     blocks.add(p.world.getBlockAt(p.location.subtract(0.0, 1.0, 2.0)))
                     blocks.add(p.world.getBlockAt(p.location.subtract(0.0, 1.0, -2.0)))
                     for (b in blocks) {
-                        val playerArray = Bukkit.getOnlinePlayers().toTypedArray<Player>()
-                        val n = playerArray.size
-                        var n2 = 0
-                        while (n2 < n) {
-                            val pl = playerArray[n2]
-                            pl.playEffect(b.location, Effect.STEP_SOUND, b.type)
-                            ++n2
+                        for (player in Bukkit.getOnlinePlayers()) {
+                            if (plugin.config.getString("doublejump.preferences.${player.uniqueId}")?.startsWith("disable") == true) return
+                            player.playEffect(b.location, Effect.STEP_SOUND, b.type)
                         }
                     }
                 }
@@ -89,18 +92,10 @@ class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
     fun onMove(e: PlayerMoveEvent) {
         val p = e.player
         val uuid = p.uniqueId
-        if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable")){
+        if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable", true)) {
             return
-        }
-        if (!p.hasPermission("DJP.doubleJump") && p.allowFlight && !fixed.contains(p)) {
-            p.isFlying = false
-            p.allowFlight = false
-            fixed.add(p)
         }
         if (p.gameMode == GameMode.CREATIVE || p.gameMode == GameMode.SPECTATOR) {
-            return
-        }
-        if (!p.hasPermission("DJP.doubleJump")) {
             return
         }
         if (cooldown[p] != null && cooldown[p]!!) {
@@ -112,9 +107,12 @@ class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
             cooldown[p] = true
         }
 
-        if (cooldown[p] != null && !cooldown[p]!!) {
-            for (player in Bukkit.getOnlinePlayers()) {
-                player.playEffect(p.location, Effect.SMOKE, 2004)
+        if (!plugin.config.getString("doublejump.preferences.$uuid").equals("disable particles", true)) {
+            if (cooldown[p] != null && !cooldown[p]!!) {
+                for (player in Bukkit.getOnlinePlayers()) {
+                    if (plugin.config.getString("doublejump.preferences.${player.uniqueId}")?.startsWith("disable") == true) return
+                    player.playEffect(p.location, Effect.SMOKE, 2004)
+                }
             }
         }
     }
@@ -126,15 +124,15 @@ class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
             return
         }
         val uuid = p.uniqueId
-        if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable")){
+        if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable", true)) {
             return
         }
-        if (p.hasPermission("DJP.doubleJump") && cooldown[p]!!) {
+        if (cooldown[p]!!) {
             e.isCancelled = true
             cooldown[p] = false
             p.velocity = p.location.direction.multiply(1.6).setY(1.0)
 
-            if (!plugin.config.getString("doublejump.preferences.$uuid").equals("disable particles")) {
+            if (!plugin.config.getString("doublejump.preferences.$uuid").equals("disable particles", true)) {
                 for (player in Bukkit.getOnlinePlayers()) {
                     player.playEffect(p.location, Effect.MOBSPAWNER_FLAMES, 2004)
                 }
@@ -149,11 +147,8 @@ class DoubleJump (private val plugin: Score) : CommandExecutor, Listener {
         if (p.gameMode == GameMode.CREATIVE || p.gameMode == GameMode.SPECTATOR) {
             return
         }
-        if (!p.hasPermission("DJP.groundPound")) {
-            return
-        }
         val uuid = p.uniqueId
-        if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable")){
+        if (plugin.config.getString("doublejump.preferences.$uuid").equals("disable", true)) {
             return
         }
         if (!p.isOnGround && cooldown[p] != null && !cooldown[p]!!) {

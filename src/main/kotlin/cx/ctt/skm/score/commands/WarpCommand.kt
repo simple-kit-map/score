@@ -22,8 +22,9 @@ import java.util.*
 class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
     companion object {
 
+/*
         fun listWarps(warpSect: ConfigurationSection, player: Player, page: Int = 1) {
-            val warps = getWarpNamesRecursively(warpSect)
+            val warps = getWarpNamesRecursively(warpSect).sorted()
             if (warps.isEmpty()) {
                 player.sendMessage("No warps found"); return
             }
@@ -43,6 +44,7 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
             val startIndex = (itemsPerPage * (page - 1))
             var slot = 0
             for (index in startIndex..warps.size){
+                if (index == warps.size) break
                 if (slot == 45) break
                 val warp = warps[index]
 
@@ -61,25 +63,27 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
             player.openInventory(inv)
 
         }
+*/
 
-        fun teleportToWarp(plugin: Score, player: Player, name: String, silent: Boolean = false): Boolean {
+        fun teleportToWarp(plugin: Score, player: Player, name: String, label: String = "warp"): Boolean {
             player.teleport(
                 plugin.config.getLocation("warps.$name.coords") ?: run {
                     player.sendMessage("Failed getting warp $name")
                     return true
                 })
 
-            plugin.PlayerStatuses[player]?.warp = name
-            if (silent) {
-                val followMsg = TextComponent("$DARK_GRAY${player.name.lowercase()} followed!")
+            plugin.config.set("status.${player.uniqueId}.warp", name)
+            if (label == "warp-f") {
+                val followMsg = TextComponent("$DARK_GRAY${player.name.lowercase()}->$name")
                 followMsg.hoverEvent =
-                    HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${DARK_GRAY}to $name")))
-                followMsg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-s $name")
+                    HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${DARK_GRAY}warped to $name")))
+                followMsg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-f $name")
                 Bukkit.spigot().broadcast(followMsg)
-            } else {
+            } else if (!label.endsWith("-s")){
                 val msg =
                     TextComponent("${DARK_PURPLE}* ${player.name} ${LIGHT_PURPLE}warped to ${GRAY}[$GREEN$name${GRAY}]")
-                msg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-s $name")
+                msg.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${GREEN}Click me to warp to $name!")))
+                msg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-f $name")
                 Bukkit.spigot().broadcast(msg)
             }
             return true
@@ -90,6 +94,7 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
 
             fun scanSection(section: ConfigurationSection, currentPath: String) {
                 for (key in section.getKeys(false)) {
+
                     // Skip reserved keys
                     if (blacklistedKeys.contains(key.lowercase(Locale.getDefault()))) {
                         continue
@@ -104,7 +109,7 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                         warps.add(fullPath)
                     }
 
-                    // Recursively scan deeper sub-sections
+                    // Recursively scan deeper subsections
                     scanSection(subSection, fullPath)
                 }
             }
@@ -124,9 +129,11 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
             return true
         }
         if (args.isEmpty()) {
-            listWarps(plugin.config.getConfigurationSection("warps")!!, sender)
+//            listWarps(plugin.config.getConfigurationSection("warps")!!, sender)
+            MainMenu.listSection(plugin.config.getConfigurationSection("warps")!!, sender)
             return true
         }
+
 
         if (label.endsWith("setwarp") && args.size == 1) {
             if (plugin.config.contains("warps.${args[0]}")) {
@@ -159,6 +166,25 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                 }
                 sender.spigot().sendMessage(list)
             }
+            args[0] in listOf("del", "delete", "remove", "rm") -> {
+                if (args.size == 1) {
+                    sender.sendMessage("${RED}usage: /warp del <warpname>")
+                    return true
+                }
+                if (args[1] !in warps){
+                    sender.sendMessage("${RED}Warp ${args[1]} does not exist.")
+                    return true
+                }
+                if (plugin.config.getString("warps.${args[1]}.author") != sender.uniqueId.toString() && !sender.hasPermission("score.warps.delete.others")) {
+                    sender.sendMessage("${LIGHT_PURPLE}You don't have permission to delete $DARK_PURPLE${args[1]}")
+                    return true
+                }
+                plugin.config.set("warps.${args[1]}", null)
+                plugin.saveConfig()
+                sender.sendMessage("${GREEN}Warp ${args[1]} deleted")
+                return true
+
+            }
 
             args[0] == "seticon" -> {
                 if (args.size == 1) {
@@ -178,7 +204,7 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                 sender.sendMessage("${GREEN}warp icon set for ${args[1]}")
                 return true
             }
-            args.size == 1 -> return teleportToWarp(plugin, sender, args[0], silent = (label == "warp-s"))
+            args.size == 1 -> return teleportToWarp(plugin, sender, args[0], label)
 
             else -> {
                 args.drop(1).map { playerToWarp ->

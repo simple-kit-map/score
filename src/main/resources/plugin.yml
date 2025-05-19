@@ -3,6 +3,8 @@ version: '1.0-SNAPSHOT'
 main: cx.ctt.skm.score.Score
 api-version: '1.21'
 softdepend: [Essentials, PlayerKits2]
+author: [Couleur]
+description: "a simple core for skm"
 libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20']
 
 commands:
@@ -12,10 +14,12 @@ commands:
       aliases: [ps, pstatus]
     kit:
       description: claim an inventory/armor/effect loadout
-      aliases: [k, kits, setkit, kit-s]
+      aliases: [k, kits, setkit, kit-s, kit-f]
     warp:
       description: teleport to a point of interest
-      aliases: [w, warps, setwarp, warp-s]
+      aliases: [w, warps, setwarp, warp-s, warp-f]
+    motd:
+      description: change motd (admin only)
     build:
       description: toggle being able to build
       aliases: [bu]
@@ -31,9 +35,9 @@ commands:
     doublejump:
       description: double jump to leap
       aliases: [dj]
-    knockback:
-      description: set your knockback
-      aliases: [kb]
+    mech:
+      description: set/manage your mechanic(s)
+      aliases: [mech-s, mech-f, mechanic, mechanics, mc, kb, kbs, knockback, knockbacks]
     ping:
       description: get your latency
       aliases: [ms, latency]

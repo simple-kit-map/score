@@ -33,13 +33,12 @@ class Score : JavaPlugin() {
         this.config.save(File(this.dataFolder, "config.yml"))
     }
 
-    var PlayerStatuses: MutableMap<Player, PlayerStatus.PlayerStatus> = mutableMapOf()
     override fun onEnable() {
 //        val ess = Bukkit.getPluginManager().getPlugin("Essentials")
 //        if (ess!!.isEnabled) {
 //            this.logger.info((ess::class.members.first { member -> member.name == "getWarp" }).call("soccer") as String)
 //        }
-        for (mainSection in listOf("old-player-knockback", "warps", "kits", "status")) {
+        for (mainSection in listOf("old-player-knockback", "warps", "kits", "status", "mechanics")) {
             if (!config.isConfigurationSection(mainSection)) {
                 config.createSection(mainSection);
             }
@@ -60,6 +59,8 @@ class Score : JavaPlugin() {
         getCommand("warp")?.setExecutor(warpCommand)
         server.pluginManager.registerEvents(warpCommand, this)
 
+        getCommand("motd")?.setExecutor(MotdCommand(this))
+        server.pluginManager.registerEvents(MotdCommand(this), this)
 
         getCommand("hide")?.setExecutor(HideCommand(this))
         getCommand("ping")?.setExecutor(PingCommand(this))

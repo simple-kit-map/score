@@ -7,6 +7,8 @@
  */
 package cx.ctt.skm.score.mechanics
 
+import cx.ctt.skm.score.Score
+import cx.ctt.skm.score.commands.KnockbackCommand
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.attribute.Attribute
@@ -23,16 +25,16 @@ import org.bukkit.event.entity.EntityDamageEvent.DamageModifier
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerVelocityEvent
 import org.bukkit.util.Vector
-import cx.ctt.skm.score.Score
 import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-
 class Knockback(val plugin: Score): Listener {
 
     private val playerKnockbackHashMap: MutableMap<UUID, Vector> = WeakHashMap()
+
+
 
     @EventHandler
     fun onPlayerQuit(e: PlayerQuitEvent) {
@@ -59,15 +61,25 @@ class Knockback(val plugin: Score): Listener {
     }
 
 
+    inline fun <reified T> fromArray(args: Array<Any?>): T {
+        val constructor = T::class.constructors.first()
+        return constructor.call(*args)
+    }
+
     // Monitor priority because we don't modify anything here, but apply on velocity change event
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onEntityDamageEntity(event: EntityDamageByEntityEvent) {
+        if (event.entity !is Player) return
+        val kbName2 = plugin.config.getString("status.${event.entity.uniqueId}.mechanic") ?: return
+        val kb2: KnockbackCommand.Companion.mechData = plugin.config.get("mechanics.$kbName2") as KnockbackCommand.Companion.mechData
 
-        val kbName : String? = plugin.config.getString("old-player-knockback.custom.selection." + event.entity.uniqueId)
+        val kb = fromArray<Knockback>(plugin.config.getIntegerList("status.${event.entity.uniqueId}.mechanics").toTypedArray())
+
+        val kbName : String? = plugin.config.getString("status.${event.entity.uniqueId}.mechanic")
 
         val sender = event.entity
 
-        val path = "old-player-knockback.custom.configs.$kbName"
+        val path = "mechanics.$kbName"
         if (kbName.isNullOrEmpty() || !plugin.config.contains("$path.values")) {
             sender.sendMessage("Knockback preset $kbName does not exist, you will be taking vanilla knockback")
         }
@@ -118,15 +130,47 @@ class Knockback(val plugin: Score): Listener {
             if (playerVelocity.y > knockbackVerticalLimit) playerVelocity.setY(knockbackVerticalLimit)
 
             if (bonusKnockback > 0) { // Apply bonus knockback
+
+                var extraHorizontal = knockbackExtraHorizontal
+
+//                val distanceX = attackerLocation.x - victimLocation.x
+//                val distanceZ = attackerLocation.z - victimLocation.z
+//                val range = hypot(distanceX, distanceZ)
+//                var rangeReduction = Math.max((range - startRange) * rangeFactor, 0).toDouble()
+//
+//                if (rangeReduction > maximumRangeReduction) {
+//                    rangeReduction = maximumRangeReduction
+//                }
+//
+//                extraHorizontal -= rangeReduction
+
                 playerVelocity.add(
                     Vector(
-                        (-sin((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * knockbackExtraHorizontal),
+                        (-sin((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * extraHorizontal),
                         knockbackExtraVertical,
-                        cos((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * knockbackExtraHorizontal
+                        cos((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * extraHorizontal
                     )
                 )
             }
         }
+
+//        // Example reduction values per armor piece (modifiable as required)
+//        val knockbackReductionPerPiece = netheriteKnockbackResistance // 10% knockback reduction for each piece of armor
+//
+//        // Calculate total knockback reduction from armor
+//        val armorKnockbackReduction = damagee.inventory.armorContents.filterNotNull().size * knockbackReductionPerPiece
+//
+//        // Convert reduction to a factor (e.g., 10% -> 0.1)
+//        val reductionFactor = 1 - (armorKnockbackReduction / 100.0)
+//
+//        // Get the player's current knockback resistance from attributes
+//        val baseResistance = damagee.getAttribute(Attribute.KNOCKBACK_RESISTANCE)?.value ?: 0.0
+//
+//        // Multiply the velocity by the combined resistance factor
+//        val combinedResistance = reductionFactor * (1 - baseResistance)
+//
+//        // Apply the adjusted knockback to the velocity
+//        playerVelocity.multiply(Vector(combinedResistance, 1.0, combinedResistance))
 
         if (netheriteKnockbackResistance) {
             // Allow netherite to affect the horizontal knockback. Each piece of armour yields 10% resistance

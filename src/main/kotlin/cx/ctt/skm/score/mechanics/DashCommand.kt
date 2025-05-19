@@ -15,9 +15,14 @@ class Dash : CommandExecutor, Listener{
         }
         return true
     }
-    private fun dash(player: Player, multiplier: Double = 2.0){
-        val playerDirection: Vector = player.location.getDirection()
+    private fun dash(player: Player, multiplier: Double = 2.0) {
+        val playerDirection: Vector = player.location.direction
         playerDirection.multiply(multiplier)
+        when {
+            player.velocity.x > 0 -> playerDirection.x += player.velocity.x
+            player.velocity.y > 0 -> playerDirection.x += player.velocity.y
+            player.velocity.x > 0 -> playerDirection.x += player.velocity.x
+        }
         player.velocity = playerDirection
     }
 }
