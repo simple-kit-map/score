@@ -1,15 +1,13 @@
 package cx.ctt.skm.score.mechanics
 
 import cx.ctt.skm.score.MainMenu
+import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
 import cx.ctt.skm.score.commands.Kit
 import cx.ctt.skm.score.commands.WarpCommand
 import net.md_5.bungee.api.ChatColor
 import net.md_5.bungee.api.ChatColor.*
-import org.bukkit.Bukkit
-import org.bukkit.Location
-import org.bukkit.Material
-import org.bukkit.Sound
+import org.bukkit.*
 import org.bukkit.block.*
 import org.bukkit.block.sign.Side
 import org.bukkit.entity.EntityType
@@ -41,6 +39,7 @@ class Listeners (private val plugin: Score): Listener {
 // for later :>
 @EventHandler
 fun onProjectileLaunch(event: ProjectileLaunchEvent) {
+
     val shooter = event.entity.shooter
     if (shooter !is Player) return
 
@@ -52,20 +51,18 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
     )
 
     val projectile = event.entity
-    val velocity = projectile.velocity
-    location.setDirection(projectile.location.direction)
     projectile.teleport(location)
-    plugin.logger.info("shoo:${shooter.location.toString()}")
-    plugin.logger.info("proj:${location.toString()}")
-    projectile.velocity = velocity
+//    plugin.logger.info("shoo:${shooter.location.toString()}")
+//    plugin.logger.info("proj:${location.toString()}")
 
-    if (event.entityType != EntityType.ARROW){
+    if (event.entityType == EntityType.POTION){
         val direction = shooter.location.direction.normalize()
         val projDirection = projectile.velocity
         val originalMagnitude = projDirection.length()
         projDirection.normalize()
         direction.multiply(min(originalMagnitude, 0.502))
         projectile.velocity = direction
+        (event.entity.shooter as Player).sendMessage("velo \"direction\" is ${direction.toString()}")
     }
 }
     @EventHandler
@@ -80,7 +77,8 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
             val delta = now - lastTime
 
             if (delta in 1..150) {
-                MainMenu.listSection(plugin.config.getConfigurationSection("status")!!, player)
+                MainMenu.listSection(plugin, event.player, mType = MenuType.Status)
+//                listPlayerStatus(plugin, player)
                 lastSneak.remove(uuid)
             } else {
                 // Update the timestamp
@@ -266,8 +264,16 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
         return ret
     }
 
+
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
+
+
+//        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+//            plugin.logger.info (event.entity.toString())
+            event.entity.playEffect(EntityEffect.SPAWN_DEATH_SMOKE)
+
+//        }, 0L)
         if (event.entity.killer !is Player) return
 
         val deathCause = event.entity.lastDamageCause ?: run {
@@ -313,7 +319,9 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
 
             event.deathMessage = "${killed.name} got quickdropped by $DARK_GRAY(${color}${killerMats - killedMats} $term$DARK_GRAY)$RESET against ${killer.name} $killerHealth"
         }
+
     }
+
     @EventHandler
     fun onPlayerRespawn (event: PlayerRespawnEvent){
         val ps = plugin.config.getConfigurationSection("status.${event.player.uniqueId}")
@@ -322,9 +330,10 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
             plugin.logger.severe("no ps for ${event.player.name}")
             return
         }
-        val hdPath = "old-player-knockback.custom.configs.${ps.getString("knockback")!!}.values.hitdelay"
+        val hdPath = "mechanics.${ps.getString("mechanic")!!}.values.hitdelay"
         val ht = plugin.config.getInt(hdPath, 20)
         event.player.noDamageTicks = ht
+        event.player.maximumNoDamageTicks = ht
 
         val kit = ps.getString("kit")
         if (kit !=null && kit != "None")
@@ -334,7 +343,7 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
         var warpName = ps.getString("warp")!!
         val warps = WarpCommand.getWarpNamesRecursively(warpSect)
 
-        val hasSubWarps = warps.any { "$it.".startsWith(warpName) }
+        val hasSubWarps = warps.any {it.startsWith("$warpName.") }
 
         if (hasSubWarps || warpName.last().isDigit() && warpName.contains('.')){
             var randomWarp = warpName
@@ -348,14 +357,14 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
                 it.contains('.') &&
                 it.startsWith(randomWarp) && it != warpName
             }
-            event.player.sendMessage("$warpName shouldnt be in ${subWarps.joinToString(", ")}")
+//            event.player.sendMessage("$warpName shouldnt be in ${subWarps.joinToString(", ")}")
 
             warpName = if (subWarps.isNotEmpty()){
                 subWarps.random()
             } else {
                 randomWarp
             }
-            event.player.sendMessage("new warp: $warpName")
+//            event.player.sendMessage("new warp: $warpName")
         }
         val warpLoc = warpSect.getLocation("$warpName.coords")!!
         ps.set("warp", warpName)

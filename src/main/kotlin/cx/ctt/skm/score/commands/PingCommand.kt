@@ -12,8 +12,8 @@ import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 
 class PingCommand(private val plugin: Score): CommandExecutor {
-
-    private fun formatMs(ping: Int): ChatColor {
+companion object {
+    public fun formatMs(ping: Int): ChatColor {
         return when {
             ping > 199 -> DARK_RED
             ping > 149 -> RED
@@ -23,6 +23,7 @@ class PingCommand(private val plugin: Score): CommandExecutor {
             else -> GREEN
         }
     }
+}
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (sender is Player){
 //            if ((System.currentTimeMillis() - plugin.essentials.getUser(sender).lastLogin) < 120000){

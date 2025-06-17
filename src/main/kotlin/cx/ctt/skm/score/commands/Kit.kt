@@ -1,6 +1,7 @@
 package cx.ctt.skm.score.commands
 
 import cx.ctt.skm.score.MainMenu
+import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.ChatColor.*
 import net.md_5.bungee.api.chat.ClickEvent
@@ -25,7 +26,7 @@ import java.util.*
 class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
 
     companion object {
-        fun listKits(plugin: Score, player: CommandSender, gui: Boolean): Boolean {
+/*        fun listKits(plugin: Score, player: CommandSender, gui: Boolean): Boolean {
             val kits = plugin.config.getConfigurationSection("kits")!!.getKeys(false)
             if (!gui) {
                 val msg = TextComponent("${DARK_PURPLE}* ${kits.size} ${LIGHT_PURPLE}kits are available:\n")
@@ -55,7 +56,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                     val lore = mutableListOf<String>()
                     kitSection.getString("author")?.let {
                         val id = UUID.fromString(it)
-                        var authorName = (Bukkit.getPlayer(id) ?: Bukkit.getOfflinePlayer(id)).name
+                        var authorName = (Bukkit.getPlayer(id) ?: Bukkit.getOfflinePlayer(id)).name ?: "Unknown?"
                         authorName = if (authorName == player.name) "${RED}you" else "${DARK_PURPLE}$authorName"
                         lore.add("${LIGHT_PURPLE}by $authorName")
                     }
@@ -65,10 +66,10 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                     icon.itemMeta = meta
                     inv.setItem(index, icon)
                 }
-                MainMenu.renderToolbar(player, inv)
+                MainMenu.renderToolbar(plugin, player, inv)
             }
             return true
-        }
+        }*/
 
 
         /** helo i give you player i fill his inv and yap abt it :) **/
@@ -91,10 +92,11 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
 //        player.inventory.chestplate = armorsDone[2];
 //        player.inventory.helmet = armorsDone[3];
 
-//        player.inventory.setItemInOffHand(kit["offhand"] as ItemStack?)
             val itemStacks = readItemStackList(plugin, kit, "inventory").toTypedArray()
-//        player.sendMessage("mes couilles: $itemStacks")
             player.inventory.contents = itemStacks
+            player.health = 20.0
+            player.foodLevel = 20
+            player.saturation = 20.0F
 
 
             player.activePotionEffects.forEach { player.removePotionEffect(it.type) }
@@ -154,7 +156,6 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
             }
 //        plugin.logger.info("items: ${(items as HashMap<String, ItemStack>).size}")
 
-            ret
             return ret.toList()
 //        return when (items) {
 //            is List<*> -> items.filterIsInstance<ItemStack>()
@@ -164,18 +165,18 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
 //        }
         }
 
-        fun previewKit(plugin: Score, player: Player, name: String): Boolean {
+        fun previewKit(plugin: Score, player: Player, name: String, duel: Boolean = false): Boolean {
             val kit = plugin.config.getConfigurationSection("kits.$name")!!
             val authorIdString = kit.getString("creator")
             val author = if (authorIdString == null) {
-                "Unknown"
+                "Unknown?"
             } else {
                 val authorId = UUID.fromString(authorIdString)
-                (Bukkit.getPlayer(authorId) ?: Bukkit.getOfflinePlayer(authorId)).name ?: "Someone"
+                (Bukkit.getPlayer(authorId) ?: Bukkit.getOfflinePlayer(authorId)).name ?: "Unknown?"
             }
-
             val title = "${LIGHT_PURPLE}Kit $DARK_PURPLE$name ${LIGHT_PURPLE}by ${DARK_PURPLE}${author}"
-            val inv = Bukkit.createInventory(null, 54, title)
+            val mType = if(duel) MenuType.KitPreview else MenuType.KitPreviewDuel
+            val inv = Bukkit.createInventory(mType, 54, title)
 
             inv.clear()
 //        loadToolbar(inv, CurrentlyOpen.KIT_PREVIEW)
@@ -228,7 +229,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                 if (item == null) inv.setItem(slot, ItemStack(Material.AIR))
                 else inv.setItem(slot, item)
             }
-            MainMenu.renderToolbar(player, inv)
+            MainMenu.renderToolbar(plugin, player, inv)
             return true
         }
 
@@ -275,7 +276,13 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         val help = "/kit <kitname>"
         if (args.isEmpty()) {
-            return listKits(plugin, sender, true)
+            if (sender !is Player){
+                sender.sendMessage(help)
+                return true
+            }
+            MainMenu.listSection(plugin, sender, mType = MenuType.Kit)
+            return true
+//            return listKits(plugin, sender, true)
         }
         val args = args.map { it.lowercase() }.toMutableList()
 
@@ -295,7 +302,9 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                         sender.inventory.chestplate = null
                         sender.inventory.leggings = null
                         sender.inventory.boots = null
-                        sender.activePotionEffects.clear()
+                        sender.activePotionEffects.forEach { 
+                            sender.removePotionEffect(it.type)
+                        }
                     }
                 }
 
@@ -334,6 +343,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                         val effectType = when (effect) {
                             "speed", "s" -> PotionEffectType.SPEED
                             "str", "strength", "strenght", "st", "strong" -> PotionEffectType.STRENGTH
+                            "slowness", "slow" -> PotionEffectType.SLOWNESS
                             "nv", "nightvision" -> PotionEffectType.NIGHT_VISION
                             "jump", "jumpboost" -> PotionEffectType.JUMP_BOOST
                             "res", "resistance", "boxing", "invincible" -> PotionEffectType.RESISTANCE
@@ -343,7 +353,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                             "saturation", "sat", "satur", "infinitefood", "infinitehunger" -> PotionEffectType.SATURATION
                             else -> {
                                 val closest = PotionEffectType.values().find {
-                                    sender.sendMessage(it.name)
+//                                    sender.sendMessage(it.name)
                                     it.name.equals(effect, true) }
                                 if (closest == null){
                                     sender.sendMessage("Failed parsing effect $effect")
@@ -352,22 +362,17 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                                 closest
                             }
                         }
-                        sender.activePotionEffects.forEach {
-                            if (it.type.name.equals(mod.drop(2), true))
-                                sender.removePotionEffect(it.type)
-
-                            if (amplifier > -1)
-                                sender.addPotionEffect(
-                                    PotionEffect(
-                                        effectType,
-                                        -1,
-                                        amplifier,
-                                        false,
-                                        true
-                                    )
+                        sender.removePotionEffect(effectType)
+                        if (amplifier != -1)
+                            sender.addPotionEffect(
+                                PotionEffect(
+                                    effectType,
+                                    -1,
+                                    amplifier,
+                                    true,
+                                    true
                                 )
-
-                        }
+                            )
 
                     }
 
@@ -413,8 +418,19 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                 sender.inventory.itemInMainHand.clone(),
                 KitPart.POTIONEFFECTS
             )
+            "setinventory", "setinv" -> return set(
+                sender as Player,
+                args[1],
+                sender.inventory.itemInMainHand.clone(),
+                KitPart.INVENTORY
+            )
 
-            "list", "ls", "lists" -> return listKits(plugin, sender, false)
+
+//            "list", "ls", "lists" -> return listKits(plugin, sender, false)
+            "list", "ls", "lists" -> {
+                MainMenu.listSection(plugin, sender as Player, mType = MenuType.Kit)
+                return true
+            }
             "view", "preview", "pv" -> {
                 if (args.size < 2) {
                     sender.sendMessage(help)
@@ -460,9 +476,14 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                     return true
                 }
 
-                if ((sender as Player).inventory.itemInMainHand.type != Material.AIR) {
-                    set(sender, args[1], sender.inventory.itemInMainHand.clone())
+                if (sender !is Player){
+                    sender.sendMessage("This command can only be used by players")
+                    return true
                 }
+
+                var icon = sender.inventory.itemInMainHand
+                if (icon == ItemStack(Material.AIR)) icon = ItemStack(Material.BOOK)
+                set(sender, args[1], icon.clone())
             }
 
 

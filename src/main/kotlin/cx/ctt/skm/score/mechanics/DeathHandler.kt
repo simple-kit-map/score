@@ -7,8 +7,8 @@ import org.bukkit.event.Listener
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.potion.PotionEffect
-import java.util.UUID
-import kotlin.collections.HashMap
+import java.util.*
+
 /*
 * https://github.com/GavvyDizzle/PersistentEffects
 * https://www.spigotmc.org/resources/persistenteffects.106587/
@@ -16,7 +16,7 @@ import kotlin.collections.HashMap
 class DeathHandler(private val plugin: Score) : Listener {
     private val playerEffects = HashMap<UUID, Collection<PotionEffect>>()
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onDeath(e: PlayerDeathEvent) {
         val effects = e.entity.activePotionEffects
         if (effects.isEmpty()) {
@@ -27,6 +27,13 @@ class DeathHandler(private val plugin: Score) : Listener {
 
     @EventHandler
     fun onRespawn(e: PlayerRespawnEvent) {
+
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            // scuffed viabackwards fix that closes the second "You Died!" menu on death for 1.7.10 clients
+            e.player.closeInventory()
+        }, 1L)
+
+        e.player.arrowsInBody = 0
         if (playerEffects.containsKey(e.player.uniqueId)) {
             val player = e.player
             Bukkit.getScheduler().scheduleSyncDelayedTask(this.plugin, {

@@ -1,10 +1,10 @@
 package cx.ctt.skm.score.commands
 
-import cx.ctt.skm.score.MainMenu
+import cx.ctt.skm.score.MainMenu.Companion.listSection
+import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
-import net.md_5.bungee.api.ChatColor.*
+import net.md_5.bungee.api.ChatColor.AQUA
 import org.bukkit.Bukkit
-import org.bukkit.Material
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
@@ -14,39 +14,10 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerTeleportEvent
-import org.bukkit.inventory.ItemStack
-import java.util.*
 
 class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCompleter {
     private val conf = plugin.config
     companion object {
-        fun listPlayerStatus(plugin: Score, player: Player) {
-            val inv = Bukkit.createInventory(null, 54, "${DARK_PURPLE}* ${Bukkit.getOnlinePlayers().size} ${LIGHT_PURPLE}players are connected:")
-
-            val a = plugin.config
-            val players = plugin.config.getConfigurationSection("status")!!.getKeys(false).filter { Bukkit.getPlayer(UUID.fromString(it)) != null }
-            for ((i, playerName) in  players.withIndex()) {
-                val pstatus = plugin.config.getConfigurationSection("status.$playerName")!!
-                val warp = pstatus.getString("warp")!!
-                val kit = pstatus.getString("kit")!!
-                val knockback = pstatus.getString("knockback")!!
-
-                val statusItem = ItemStack(Material.PLAYER_HEAD)
-                val meta = statusItem.itemMeta!! as org.bukkit.inventory.meta.SkullMeta
-                val playerPlayer = Bukkit.getPlayer(UUID.fromString(playerName)) ?: continue
-                meta.setDisplayName("$AQUA${playerPlayer.name}")
-                meta.setOwningPlayer(playerPlayer)
-                val lore = mutableListOf<String>()
-                lore.add("${RESET}Warp: $AQUA${warp}")
-                lore.add("${RESET}Kit: $AQUA${kit}")
-                lore.add("${RESET}Knockback: $AQUA${knockback}")
-                meta.lore = lore
-                statusItem.itemMeta = meta
-                inv.setItem(i, statusItem)
-            }
-            MainMenu.renderToolbar(player, inv)
-            player.openInventory(inv)
-        }
     }
 
     @EventHandler
@@ -66,15 +37,16 @@ class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCom
             }, 5L)
             knockback = "ikari"
             conf.set("status.${player.uniqueId}.mechanic", knockback)
+        } else {
+            val hdPath = "mechanics.${knockback}.values.hitdelay"
+            val ht = plugin.config.getInt(hdPath, 20)
+            event.player.maximumNoDamageTicks = ht
+            event.player.noDamageTicks = ht
         }
 
-        val hdPath = "old-player-knockback.custom.configs.${knockback}.values.hitdelay"
-        val ht = plugin.config.getInt(hdPath, 20)
-        event.player.maximumNoDamageTicks = ht
 
         plugin.config.set("status.${player.uniqueId}.warp", warp)
         plugin.config.set("status.${player.uniqueId}.kit", kit)
-        plugin.config.set("status.${player.uniqueId}.knockback", knockback)
         plugin.saveConfig()
     }
 /*    @EventHandler
@@ -89,41 +61,31 @@ class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCom
             event.player.sendMessage("You have teleported to an unknown location, how did that happen?")
             return
         }
-//        event.to!!.world!!.getNearbyEntities(event.to!!, event.to!!.x, event.to!!.y, event.to!!.z)
-        for (p in Bukkit.getOnlinePlayers()){
-            if (p.location == event.to){
-                val theirLastWarp = plugin.config.getString("status.${p.uniqueId}.warp")
-                Bukkit.broadcastMessage("${player.name} have teleported to ${p.name}, which is at $theirLastWarp")
-                if (theirLastWarp != null){
-                    plugin.config.set("status.${player.uniqueId}.warp", theirLastWarp)
-                    return
-                } else {
-                    event.player.sendMessage("")
-                }
-                break
+        val tpedTo = Bukkit.getOnlinePlayers().filter { it != player && it.location == event.to }
+        if (tpedTo.isNotEmpty()){
+            val p = tpedTo.first()
+            val theirLastWarp = plugin.config.getString("status.${p.uniqueId}.warp")
+            plugin.logger.info("${player.name} have teleported to ${p.name}, which is at $theirLastWarp")
+            if (theirLastWarp != null){
+                plugin.config.set("status.${player.uniqueId}.warp", theirLastWarp)
+                return
+            } else {
+                player.sendMessage("You have teleported to ${p.name}, but they have no last warp set.")
             }
-//            else {
-//                Bukkit.broadcastMessage("othe:${p.location}")
-//                Bukkit.broadcastMessage("to..:${event.to!!}")
-//                Bukkit.broadcastMessage("tper:${player.location}")
-//            }
+        } else {
+            plugin.logger.info("to: ${event.to.toString()}")
         }
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (sender !is Player) return true
-//        val inv = Bukkit.createInventory(null, 54, "Player Status")
-        listPlayerStatus(plugin, sender)
-//        sender.openInventory(inv)
-        return true
+        return listSection(plugin, sender, mType = MenuType.Status)
     }
 
     override fun onTabComplete(
         p0: CommandSender,
         p1: Command,
         p2: String,
-        p3: Array<out String>
-    ): MutableList<String>? {
-        TODO("Not yet implemented")
-    }
+        p3: Array<String>
+    ): MutableList<String>? {return mutableListOf()}
 }

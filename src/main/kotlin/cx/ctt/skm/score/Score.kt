@@ -12,9 +12,10 @@ import java.io.File
 
 
 class Score : JavaPlugin() {
+
     //    var essentials = Bukkit.getPluginManager().getPlugin("Essentials") as IEssentials
 //    var playerKitsAPI = Bukkit.getPluginManager().getPlugin("PlayerKits2") as PlayerKits2
-    var isModern = Bukkit.getVersion().startsWith("1.2")
+    var isModern = Bukkit.getVersion().startsWith("1.22")
     //    fun getWarps(): Collection<String> { return if (isModern) essentials.warps.list else listOf("soccer", "spawn")}
 //    fun getWarp(name: String): Location? { return if (isModern) essentials.warps.getWarp(name) else Location(Bukkit.getWorld("world"),0.0, 70.0, 0.0)}
 //    fun getKits(): List<String> { return if (isModern) (playerKitsAPI.kitsManager.kits.map{ it.name.lowercase()} ) else listOf("nd", "ndf", "soup") }
@@ -38,7 +39,7 @@ class Score : JavaPlugin() {
 //        if (ess!!.isEnabled) {
 //            this.logger.info((ess::class.members.first { member -> member.name == "getWarp" }).call("soccer") as String)
 //        }
-        for (mainSection in listOf("old-player-knockback", "warps", "kits", "status", "mechanics")) {
+        for (mainSection in listOf("warps", "kits", "status", "mechanics")) {
             if (!config.isConfigurationSection(mainSection)) {
                 config.createSection(mainSection);
             }

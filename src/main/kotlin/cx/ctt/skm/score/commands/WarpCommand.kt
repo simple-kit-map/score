@@ -1,6 +1,7 @@
 package cx.ctt.skm.score.commands
 
 import cx.ctt.skm.score.MainMenu
+import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.ChatColor.*
 import net.md_5.bungee.api.chat.ClickEvent
@@ -68,7 +69,11 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
         fun teleportToWarp(plugin: Score, player: Player, name: String, label: String = "warp"): Boolean {
             player.teleport(
                 plugin.config.getLocation("warps.$name.coords") ?: run {
-                    player.sendMessage("Failed getting warp $name")
+                    if (name.lowercase() in Bukkit.getOnlinePlayers().map { it.name.lowercase() })
+                        player.teleport(Bukkit.getPlayer(name)!!.location)
+                    else
+                        player.sendMessage("Failed getting warp $name")
+
                     return true
                 })
 
@@ -130,7 +135,7 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
         }
         if (args.isEmpty()) {
 //            listWarps(plugin.config.getConfigurationSection("warps")!!, sender)
-            MainMenu.listSection(plugin.config.getConfigurationSection("warps")!!, sender)
+            MainMenu.listSection(plugin, sender, mType = MenuType.Warp)
             return true
         }
 
@@ -140,6 +145,12 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                 sender.sendMessage("Warp ${args[0]} already exists")
                 return true
             }
+            val msg = TextComponent("$DARK_PURPLE* ${sender.name} ${LIGHT_PURPLE}created warp ")
+            val name = TextComponent("${GRAY}[$GREEN${args[0]}${GRAY}]")
+            name.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${GREEN}Click me to warp to $name!")))
+            name.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-f ${args[0]}")
+            msg.addExtra(name)
+            Bukkit.spigot().broadcast(msg)
             plugin.config.set("warps.${args[0]}.coords", sender.location)
             return true
         }
