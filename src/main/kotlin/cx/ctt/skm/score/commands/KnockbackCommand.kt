@@ -1,6 +1,7 @@
 package cx.ctt.skm.score.commands
 
 import cx.ctt.skm.score.MainMenu
+import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.chat.ClickEvent
 import net.md_5.bungee.api.chat.HoverEvent
@@ -13,8 +14,10 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.InventoryType
 import org.bukkit.inventory.ItemStack
 import java.util.*
+
 
 enum class NEW {
     new, create, add
@@ -37,9 +40,10 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
         get() = plugin.config
 
     companion object {
+
         data class MechInfo(
             val slot: Int,
-            val type: mechType,
+//            val type: mechType,
             val name: String,
             val defaultValue: Any,
             val lore: List<String>,
@@ -62,50 +66,59 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
         netheritearmorknockbackresistance
         */
 
-        data class mechData (
+        data class MechData (
             val horizontal: Double,
             val vertical: Double,
 
             val horizontalextra: Double,
             val verticalextra: Double,
 
-            val verticallimit: Double,
             val horizontallimit: Double,
+            val verticallimit: Double,
 
             val verticalfriction: Double,
             val horizontalfriction: Double,
 
+            val rangereduction: Boolean,
             val startrange: Double,
             val rangefactor: Double,
             val maximumrange: Double,
 
-            val netheritearmorknockbackresistance: Double,
             val hitdelay: Int,
+            val netheritekbresistance: Int,
         )
-        public enum class mechType {
-            FLOAT,
-            INT,
-            BOOLEAN,
-            DOUBLE
-        }
-        public val mechMeta: List<MechInfo> = listOf(
-            MechInfo(10, mechType.DOUBLE, "Horizontal", 0.4, listOf("")),
-            MechInfo(11, mechType.DOUBLE, "Vertical", 0.4, listOf("")),
-            MechInfo(19, mechType.DOUBLE, "Horizontal extra", 0.5, listOf("Added to horizontal when sprinting")),
-            MechInfo(20, mechType.DOUBLE, "Vertical extra", 0.1, listOf("Added to vertical when sprinting")),
-            MechInfo(28, mechType.DOUBLE, "Horizontal limit", 0.8, listOf("Maximum horizontal knockback one can take")),
-            MechInfo(29, mechType.DOUBLE, "Vertical limit", 0.4, listOf("Maximum vertical knockback one can take")),
-            MechInfo(37, mechType.DOUBLE, "Vertical friction", 2.0, listOf("")),
-            MechInfo(38, mechType.DOUBLE, "Horizontal friction", 2.0, listOf("")),
-            // RANGE REDUCTION
-            MechInfo(13, mechType.DOUBLE, "Start range", -1.0, listOf("")),
-            MechInfo(22, mechType.DOUBLE, "Range factor", 1.0, listOf("")),
-            MechInfo(31, mechType.DOUBLE, "Maximum range", 0.4, listOf("")),
-            MechInfo(40, mechType.INT, "Hit Delay", 20, listOf("Delay in ticks (20=1s) between hits"), Material.PUFFERFISH),
 
-            MechInfo(49, mechType.BOOLEAN, "Netherite KB resistance", 0, listOf("Percentage of armor reduction per netherite armor slot")),
-            )
-        fun previewMechanic(plugin: Score, mechName: String, player: Player) {
+        public val mechMeta: LinkedHashMap<String, MechInfo> = linkedMapOf(
+            "horizontal" to MechInfo(10, "Horizontal", 0.4, listOf("")),
+            "vertical" to MechInfo(11, "Vertical", 0.4, listOf("")),
+            "horizontalextra" to MechInfo(19, "Horizontal extra", 0.5, listOf("Added to horizontal when sprinting")),
+            "verticalextra" to MechInfo(20, "Vertical extra", 0.1, listOf("Added to vertical when sprinting")),
+            "horizontallimit" to MechInfo(28, "Horizontal limit", 0.8, listOf("Maximum horizontal knockback one can take")),
+            "verticallimit" to MechInfo(29, "Vertical limit", 0.4, listOf("Maximum vertical knockback one can take")),
+            "verticalfriction" to MechInfo(37, "Vertical friction", 2.0, listOf("")),
+            "horizontalfriction" to MechInfo(38, "Horizontal friction", 2.0, listOf("")),
+
+            "rangereduction" to MechInfo(4, "Range reduction", false, listOf("")),
+            "startrange" to MechInfo(13, "Start range", -1.0, listOf("")),
+            "rangefactor" to MechInfo(22, "Range factor", 1.0, listOf("")),
+            "maximumrange" to MechInfo(31, "Maximum range", 0.4, listOf("")),
+
+            "hitdelay" to MechInfo(40, "Hit Delay", 20, listOf("Delay in ticks (20=1s) between hits"), Material.PUFFERFISH),
+
+            "netheritekbresistance" to MechInfo(49, "Netherite KB resistance", 10, listOf("Percentage of armor reduction per netherite armor slot")),
+        )
+        fun castValue(value: String, defaultValue: Any, valueName: String, mechName: String): Any {
+            val value = when (defaultValue) {
+                is Boolean -> value.toBooleanStrictOrNull()
+                is Double -> value.toDoubleOrNull()
+                is Float -> value.toFloatOrNull()
+                is Int -> value.toIntOrNull()
+                else -> error("Unsupported type ${defaultValue::class.simpleName}")
+            } ?: error("${mechName}: invalid default value $value for $valueName, which defaults to $defaultValue of type ${defaultValue::class.simpleName}")
+            return value
+        }
+
+        fun previewMechanic(plugin: Score, mechName: String, player: Player, duel: Boolean = false) {
 
             val sect = plugin.config.getConfigurationSection("mechanics.$mechName")
             if (sect == null) {
@@ -114,19 +127,33 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
             }
 
             val authorId = UUID.fromString(sect.getString("creator"))
-            val author = Bukkit.getPlayer(authorId) ?: Bukkit.getOfflinePlayer(authorId)
+            val author = Bukkit.getPlayer(authorId)?.name ?: Bukkit.getOfflinePlayer(authorId).name ?: "Unknown?"
 
             val inv = Bukkit.createInventory(
-                null, 54, "${DARK_PURPLE}* $mechName ${LIGHT_PURPLE}mechanic by ${author.name}"
+                if (duel)
+                MenuType.MechanicPreviewDuel else MenuType.MechanicPreview, 54, "${DARK_PURPLE}* $mechName ${LIGHT_PURPLE}mechanic by $author"
             )
-            MainMenu.renderToolbar(player, inv)
-            for (mechanic in mechMeta) {
+            MainMenu.renderToolbar(plugin, player, inv)
 
-                val mechValue = sect.get("values." + mechanic.name.lowercase().replace(" ", ""))
+            val helper = ItemStack(Material.NAME_TAG)
+            val hMeta = helper.itemMeta!!
+            hMeta.setDisplayName("${RESET}tweak tips:")
+            hMeta.lore = listOf(
+                "${WHITE}LMB/RMB: $RED-0.1${GRAY}/${GREEN}+0.1${WHITE}", "${WHITE}w/ SHIFT: ${RED}-0.5${GRAY}/${GREEN}+0.5"
+                )
+    helper.itemMeta = hMeta
+    inv.setItem(0, helper)
+
+            val rangeReductionEnabled = sect.getBoolean("values.rangereduction")
+            for ((internalName, mechanic) in mechMeta) {
+
+                val mechValue = sect.get("values.$internalName") ?: mechanic.defaultValue
+                if (!rangeReductionEnabled && internalName in listOf("rangefactor", "maximumrange", "startrange")) continue
                 val mechItem = ItemStack(mechanic.icon)
                 val meta = mechItem.itemMeta!!
                 meta.setDisplayName("$RESET${mechanic.name}${GRAY}: ${AQUA}$mechValue")
-                val lore = mutableListOf("${WHITE}LMB/RMB: $RED-0.1${GRAY}/${GREEN}+0.1${WHITE}, w/ SHIFT: ${RED}-0.5${GRAY}/${GREEN}+0.5")
+
+                val lore = mutableListOf<String>() // mutableListOf("${WHITE}LMB/RMB: $RED-0.1${GRAY}/${GREEN}+0.1${WHITE}, w/ SHIFT: ${RED}-0.5${GRAY}/${GREEN}+0.5")
                 if (mechanic.lore.isNotEmpty()) {
                     lore.addAll(mechanic.lore)
                 }
@@ -135,6 +162,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                 inv.setItem(mechanic.slot, mechItem)
             }
             player.openInventory(inv)
+
         }
         fun modifyKnockback(plugin: Score, mechName: String, key: String, value: String, player: Player) {
             val sect = plugin.config.getConfigurationSection("mechanics.$mechName.values")!!
@@ -150,6 +178,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
             }
             sect.set(key, parsedValue)
         }
+        // apply a mechanic to a player
         fun setMechanic(sender: Player, mech: String, plugin: Score, label: String = "mech"): Boolean {
 
             if (label.endsWith("-f")){
@@ -162,14 +191,19 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                 claimButton.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${DARK_GRAY}mech $mech")))
                 claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/mech-f $mech")
                 var desc = mech
-                for (meta in mechMeta){
+                for ((_, meta) in mechMeta){
                     desc += "\n${meta.name}${GRAY}: ${AQUA}${plugin.config.get("mechanics.$mech.values.${meta.name.lowercase().replace(" ", "")}")}${RESET}"
                 }
                 claimButton.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent(desc)))
                 msg.addExtra(claimButton)
 
+                val hd = plugin.config.getInt("mechanics.$mech.values.hitdelay", 20)
+                sender.maximumNoDamageTicks = hd
+                sender.noDamageTicks = hd
+
                 Bukkit.spigot().broadcast(msg)
             }
+
             plugin.config.set("status.${sender.uniqueId}.mechanic", mech)
             return true
         }
@@ -177,6 +211,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
 
+        plugin.logger.info (plugin.config.getString("status.${(sender as Player).uniqueId}.mechanic"))
         val args = args.map { it.lowercase() }.toMutableList()
         val sender = if (sender !is Player) {
             val pl = Bukkit.getPlayer(args.removeAt(0))
@@ -197,7 +232,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
             kitBlacklist.addAll(subcommand.map { it.name })
         }
         if (args.isEmpty()){
-            MainMenu.listSection(plugin.config.getConfigurationSection("mechanics")!!, sender)
+            MainMenu.listSection(plugin, sender, mType = MenuType.Mechanic)
             return true
         }
 
@@ -211,6 +246,74 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
         }
 
         when (val first = args[0]) {
+            "setvalue", "setval" -> {
+                if (args.size == 1){
+                    sender.sendMessage("missing $label name and value")
+                    return true
+                }
+                if (args.size == 2){
+                    sender.sendMessage("missing $label value")
+                    return true
+                }
+                val mech = args[1]
+                val mechValue = args[2]
+                if (mech !in mechs){
+                    sender.sendMessage("$label $mech does not exist")
+                    return true
+                }
+                if (mechValue !in mechMeta.keys){
+                    sender.sendMessage("$label do not support any values named ${RED}$mechValue${RESET}, select amongst:")
+                    for (valid in mechMeta.keys) sender.sendMessage("${GRAY}- ${GREEN}$valid")
+                    return true
+                }
+
+                if (args.size == 3){
+                    val anvil = Bukkit.createInventory(MenuType.MechanicSetValue, InventoryType.ANVIL, "${GRAY}${args[1]}.${args[2]}")
+                    val itemToRename = ItemStack(Material.PAPER)
+                    val meta = itemToRename.itemMeta!!
+                    meta.setDisplayName("${args[2]}: ")
+                    itemToRename.itemMeta = meta
+                    anvil.setItem(0, itemToRename)
+                    sender.level = 1
+                    sender.openInventory(anvil)
+                    return true
+                }
+                if (args.size != 4) {
+                    sender.sendMessage("missing $label name, key, and value to set")
+                    return true
+                }
+                val mechName = args[1].lowercase()
+                val key = args[2].lowercase()
+                val value = args[3]
+                val sect = conf.getConfigurationSection("mechanics.$mechName.values")
+                if (sect == null) {
+                    sender.sendMessage("$label $mechName does not exist")
+                    return true
+                }
+                if (key !in mechMeta.keys) {
+                    sender.sendMessage("$label do not support any values named $key")
+                    return true
+                }
+                //! TODO: check type castable
+                sect.set(key, value)
+                sender.sendMessage("$label set $mechName.$key to $value")
+
+            }
+            // mech preview
+            in listOf("preview", "pv", "edit") -> {
+                if (args.size != 2) {
+                    args.add(conf.getString("status.${sender.uniqueId}.mechanic") ?: run {
+                        sender.sendMessage("missing $label name to preview")
+                        return true
+                    })
+                }
+                if (args[1] !in mechs) {
+                    sender.sendMessage("$label ${args[1]} does not exist")
+                    return true
+                }
+                previewMechanic(plugin, args[1], sender)
+                return true
+            }
             // mech claim
             in SET.entries.map { it.name } -> {
                 if (args.size != 2) {
@@ -249,6 +352,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                     return true
                 }
                 if (conf.contains("mechanics.$mechName")) {
+
                     if (conf.getString("mechanics.$mechName.creator") != sender.uniqueId.toString()){
                         sender.sendMessage("There already exists a mech named $mechName")
                         return true
@@ -256,22 +360,20 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                         sender.sendMessage("Squashing your existing mechanic $mechName")
                     }
                 }
-
                 args.removeFirst() // KB_NEW arg
                 args.removeFirst() // kb name
-
-
-
                 // we're left with just the values
                 if (args.size != mechMeta.size) {
                     sender.sendMessage("you provided ${args.size} knockback values, but ${mechMeta.size} are needed")
-                    mechMeta.forEachIndexed { index, mechInfo ->
+                    var index = 0
+                    mechMeta.forEach { (_, mechInfo) ->
                         val displayValue = if (index < args.size){
                             "${GREEN}${args[index]}"
                         } else {
                             "${RED}?"
                         }
                         sender.sendMessage("#${index+1}, ${mechInfo.name.replace(" ", "")}${DARK_GRAY}: $displayValue")
+                        index++
                     }
                     return true
                 }
@@ -279,7 +381,10 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
 //                conf.createSection("mechanics.$mechName.values")
 //                val vals = conf.getConfigurationSection("mechanics.$mechName.values")!!
 
-                mechMeta.forEachIndexed {index, meta ->
+//                val typedArgs = mutableListOf<Any>()
+                var index = 0
+                for ((_, meta) in mechMeta){
+//                mechMeta2.foreach {(_, meta) ->
 
                     val value = when (meta.defaultValue) {
                         is Boolean -> args[index].toBooleanStrictOrNull()
@@ -291,11 +396,18 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                     }
                     if (value == null){
                         sender.sendMessage("${LIGHT_PURPLE}Invalid input value for ${DARK_PURPLE}${meta.name}${LIGHT_PURPLE}, ${RED}${args[index]} ${LIGHT_PURPLE}is not a valid ${DARK_PURPLE}${meta.defaultValue::class.simpleName}")
-                        conf.set("mechanics.values", null)
+                        conf.set("mechanics.$mechName", null)
                         return true
                     }
                     conf.set("mechanics.$mechName.values.${meta.name.lowercase().replace(" ", "")}", value)
+//                    typedArgs.add(value)
+                    index++
                 }
+//                val argsToMech = ArgsToMech<MechData>(typedArgs)
+//                sender.sendMessage("$argsToMech")
+//                sender.sendMessage("${argsToMech.toString()}")
+//                conf.set("mechanics.$mechName.values", argsToMech.toString())
+
                 conf.set("mechanics.$mechName.creator", sender.uniqueId.toString())
                 conf.set("mechanics.$mechName.created", System.currentTimeMillis())
 
@@ -316,7 +428,8 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                     sender.sendMessage("$label $mechName does not exist")
                     return true
                 }
-                if (!sender.hasPermission("score.mechanics.delete.others") || mechSect.getString("creator")!! != sender.uniqueId.toString()) {
+                val creator = mechSect.getString("creator")
+                if (!sender.hasPermission("score.mechanics.delete.others") || (creator != null && creator != sender.uniqueId.toString())) {
                     sender.sendMessage("You don't have permission to delete this $label")
                     return true
                 }
@@ -324,6 +437,12 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                 plugin.config.set("mechanics.$mechName", null)
             }
             in LIST.entries.map { it.name } -> {
+                val mechs = conf.getConfigurationSection("mechanics")?.getKeys(false)!!
+                sender.sendMessage(mechs.joinToString(", "))
+            }
+            else -> {
+                sender.sendMessage("${LIGHT_PURPLE}$label ${DARK_PURPLE}${args.joinToString(", ")} ${LIGHT_PURPLE}does not exist")
+                plugin.logger.warning("unrecognized args `${args.joinToString(", ")}`")
             }
         }
         return true

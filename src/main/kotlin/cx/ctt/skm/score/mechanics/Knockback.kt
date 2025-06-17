@@ -9,6 +9,8 @@ package cx.ctt.skm.score.mechanics
 
 import cx.ctt.skm.score.Score
 import cx.ctt.skm.score.commands.KnockbackCommand
+import cx.ctt.skm.score.commands.KnockbackCommand.Companion.castValue
+import cx.ctt.skm.score.commands.KnockbackCommand.Companion.mechMeta
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.attribute.Attribute
@@ -20,8 +22,6 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDamageEvent
-import org.bukkit.event.entity.EntityDamageEvent.DamageCause
-import org.bukkit.event.entity.EntityDamageEvent.DamageModifier
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerVelocityEvent
 import org.bukkit.util.Vector
@@ -52,6 +52,7 @@ class Knockback(val plugin: Score): Listener {
 
     @EventHandler
     fun onEntityDamage(event: EntityDamageEvent) {
+
         // Disable netherite kb, the knockback resistance attribute makes the velocity event not be called
         val entity = event.entity
         if (entity !is Player) return
@@ -60,99 +61,89 @@ class Knockback(val plugin: Score): Listener {
         attribute?.modifiers?.forEach { attribute.removeModifier(it) }
     }
 
-
-    inline fun <reified T> fromArray(args: Array<Any?>): T {
-        val constructor = T::class.constructors.first()
-        return constructor.call(*args)
-    }
-
     // Monitor priority because we don't modify anything here, but apply on velocity change event
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onEntityDamageEntity(event: EntityDamageByEntityEvent) {
+
         if (event.entity !is Player) return
-        val kbName2 = plugin.config.getString("status.${event.entity.uniqueId}.mechanic") ?: return
-        val kb2: KnockbackCommand.Companion.mechData = plugin.config.get("mechanics.$kbName2") as KnockbackCommand.Companion.mechData
+        val mechName = plugin.config.getString("status.${event.entity.uniqueId}.mechanic") ?: return
+        val mechSect = plugin.config.getConfigurationSection("mechanics.$mechName.values")!!.getValues(false)
 
-        val kb = fromArray<Knockback>(plugin.config.getIntegerList("status.${event.entity.uniqueId}.mechanics").toTypedArray())
-
-        val kbName : String? = plugin.config.getString("status.${event.entity.uniqueId}.mechanic")
-
-        val sender = event.entity
-
-        val path = "mechanics.$kbName"
-        if (kbName.isNullOrEmpty() || !plugin.config.contains("$path.values")) {
-            sender.sendMessage("Knockback preset $kbName does not exist, you will be taking vanilla knockback")
+        val fixedArray = mutableListOf<Any>()
+        for ((key, info) in mechMeta){
+           var value = mechSect[key] ?: info.defaultValue
+            if (value != info.defaultValue && value::class != info.defaultValue::class) {
+                plugin.logger.info ("$mechName.$key: casting $value from ${value::class} to ${info.defaultValue::class.simpleName}")
+                value = castValue(mechSect[key].toString(), info.defaultValue, info.name, mechName)
+            }
+            fixedArray.add(value)
         }
-        val knockbackFriction = plugin.config.getDouble("$path.values.friction")
-        val knockbackHorizontal = plugin.config.getDouble("$path.values.horizontal")
-        val knockbackVertical = plugin.config.getDouble("$path.values.vertical")
-        val knockbackVerticalLimit = plugin.config.getDouble("$path.values.verticallimit")
-        val knockbackExtraHorizontal = plugin.config.getDouble("$path.values.extrahorizontal")
-        val knockbackExtraVertical = plugin.config.getDouble("$path.values.extravertical")
+        val constructor = KnockbackCommand.Companion.MechData::class.constructors.first()
+
+        val typed = fixedArray.toTypedArray()
+        event.entity.sendMessage(typed.joinToString(" "))
+        val a = constructor.call(*typed)
+
 
         val damager = event.damager as? LivingEntity ?: return
         val damagee = event.entity as? Player ?: return
-        val netheriteKnockbackResistance = false
-        if (event.cause != DamageCause.ENTITY_ATTACK) return
-        if (event.getDamage(DamageModifier.BLOCKING) > 0) return
+//        if (event.cause != DamageCause.ENTITY_ATTACK) return
+//        if (event.getDamage(DamageModifier.BLOCKING) > 0) return
 
         // Figure out base knockback direction
-        val attackerLocation = damager.location
-        val victimLocation = damagee.location
-        var d0 = attackerLocation.x - victimLocation.x
-        var d1: Double
+        var distanceX: Double = damager.location.x - damagee.location.x
+        var distanceZ: Double = damager.location.z - damagee.location.z
 
-        d1 = attackerLocation.z - victimLocation.z
-        while (d0 * d0 + d1 * d1 < 1.0E-4) {
-            d0 = (Math.random() - Math.random()) * 0.01
-            d1 = (Math.random() - Math.random()) * 0.01
+        while (distanceX * distanceX + distanceZ * distanceZ < 1.0E-4) {
+            distanceX = (Math.random() - Math.random()) * 0.01
+            distanceZ = (Math.random() - Math.random()) * 0.01
         }
 
-        val magnitude = sqrt(d0 * d0 + d1 * d1)
+        val magnitude = sqrt(distanceX * distanceX + distanceZ * distanceZ)
+//        val magnitude = hypot(distanceX, distanceZ)
 
         // Get player knockback before any friction is applied
         val playerVelocity = damagee.velocity
 
         // Apply friction, then add base knockback
-        playerVelocity.setX((playerVelocity.x / knockbackFriction) - (d0 / magnitude * knockbackHorizontal))
-        playerVelocity.setY((playerVelocity.y / knockbackFriction) + knockbackVertical)
-        playerVelocity.setZ((playerVelocity.z / knockbackFriction) - (d1 / magnitude * knockbackHorizontal))
+        playerVelocity.setX((playerVelocity.x / a.horizontalfriction) - (distanceX / magnitude * a.horizontal))
+        playerVelocity.setY((playerVelocity.y / a.verticalfriction) + a.vertical)
+        playerVelocity.setZ((playerVelocity.z / a.horizontalfriction) - (distanceZ / magnitude * a.horizontal))
 
         // Calculate bonus knockback for sprinting or knockback enchantment levels
+        var bonusKnockback = 0.0
+
         val equipment = damager.equipment
         if (equipment != null) {
             val heldItem =
                 if (equipment.itemInMainHand.type == Material.AIR) equipment.itemInOffHand else equipment.itemInMainHand
 
-            var bonusKnockback = heldItem.getEnchantmentLevel(Enchantment.KNOCKBACK)
-            if (damager is Player && damager.isSprinting) ++bonusKnockback
-
-            if (playerVelocity.y > knockbackVerticalLimit) playerVelocity.setY(knockbackVerticalLimit)
-
-            if (bonusKnockback > 0) { // Apply bonus knockback
-
-                var extraHorizontal = knockbackExtraHorizontal
-
-//                val distanceX = attackerLocation.x - victimLocation.x
-//                val distanceZ = attackerLocation.z - victimLocation.z
-//                val range = hypot(distanceX, distanceZ)
-//                var rangeReduction = Math.max((range - startRange) * rangeFactor, 0).toDouble()
-//
-//                if (rangeReduction > maximumRangeReduction) {
-//                    rangeReduction = maximumRangeReduction
-//                }
-//
-//                extraHorizontal -= rangeReduction
-
-                playerVelocity.add(
-                    Vector(
-                        (-sin((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * extraHorizontal),
-                        knockbackExtraVertical,
-                        cos((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * extraHorizontal
-                    )
-                )
-            }
+            bonusKnockback += heldItem.getEnchantmentLevel(Enchantment.KNOCKBACK).toDouble()
         }
+        if (damager is Player && damager.isSprinting) bonusKnockback += 1
+
+        if (playerVelocity.y > a.verticallimit) playerVelocity.setY(a.verticallimit)
+
+        if (bonusKnockback > 0) { // Apply bonus knockback
+
+            var extraHorizontal = a.horizontalextra
+
+            if (a.rangereduction){
+                var rangeReduction = Math.max((magnitude - a.startrange) * a.rangefactor, 0.0)
+
+                if (rangeReduction > a.maximumrange) rangeReduction = a.maximumrange
+
+                extraHorizontal -= rangeReduction
+            }
+            playerVelocity.add(
+                Vector(
+                    -sin((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * extraHorizontal,
+                    a.verticalextra,
+                    cos((damager.location.yaw * 3.1415927f / 180.0f).toDouble()) * bonusKnockback.toFloat() * extraHorizontal
+                )
+            )
+        }
+
 
 //        // Example reduction values per armor piece (modifiable as required)
 //        val knockbackReductionPerPiece = netheriteKnockbackResistance // 10% knockback reduction for each piece of armor
@@ -172,11 +163,12 @@ class Knockback(val plugin: Score): Listener {
 //        // Apply the adjusted knockback to the velocity
 //        playerVelocity.multiply(Vector(combinedResistance, 1.0, combinedResistance))
 
-        if (netheriteKnockbackResistance) {
-            // Allow netherite to affect the horizontal knockback. Each piece of armour yields 10% resistance
-            val resistance = 1 - (damagee.getAttribute(Attribute.KNOCKBACK_RESISTANCE)?.value ?: 0.0)
-            playerVelocity.multiply(Vector(resistance, 1.0, resistance))
-        }
+        // Allow netherite to affect the horizontal knockback. Each piece of armour yields 10% resistance
+//        if (a.netheritekbresistance > 0) {
+//            val resistance = 1 - (damagee.getAttribute(Attribute.KNOCKBACK_RESISTANCE)?.value ?: 0.0)
+//            Bukkit.broadcastMessage("resistance: $resistance")
+//            playerVelocity.multiply(Vector(resistance, 1.0, resistance))
+//        }
 
         val victimId = damagee.uniqueId
 
