@@ -1,38 +1,80 @@
 package cx.ctt.skm.score.commands
 
+import cx.ctt.skm.score.MainMenu
+import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.chat.ClickEvent
+import net.md_5.bungee.api.chat.HoverEvent
 import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
-import org.bukkit.ChatColor
 import org.bukkit.ChatColor.*
-import org.bukkit.Material
+import org.bukkit.EntityEffect
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.ItemStack
 import java.util.*
 import java.util.function.Consumer
 
 
 data class DuelInformation(
-    val warp: String,
-    val kit: String,
-    val knockback: String,
-    val initiator: Player,
-    val invitees: MutableList<Player>,
-    var started: Boolean
+    var warp: String? = null,
+    var kit: String? = null,
+    var mechanic: String? = null,
+    val gang: MutableSet<Player> = mutableSetOf(),
+    val opps: MutableSet<Player> = mutableSetOf(),
+    var started: Boolean = false
 )
 
 class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Listener {
 
     companion object {
-        var duels: HashMap<UUID, DuelInformation> = HashMap()
+        var duels: HashMap<Player, DuelInformation> = HashMap()
+        fun sendDuel(sender: Player) {
+            sender.closeInventory()
+            val di = duels[sender] ?: error("Attempted to start duel with unknown duel ID ${sender.name}")
+            val playersToDuel = di.gang + di.opps
+
+            sender.sendMessage("")
+            sender.sendMessage("$YELLOW${BOLD}Duel Sent")
+            if (di.gang.isEmpty())
+                sender.sendMessage("$YELLOW ● To: $LIGHT_PURPLE${(di.opps.joinToString { "${it.name}${GRAY}, $LIGHT_PURPLE"}).removeSuffix(", $LIGHT_PURPLE")}")
+            else {
+                sender.sendMessage("$YELLOW ● With: $LIGHT_PURPLE${di.gang.joinToString("${GRAY}, $GREEN")}")
+                sender.sendMessage("$YELLOW ● Against: $LIGHT_PURPLE${di.opps.joinToString("${GRAY}, $GREEN")}")
+            }
+            sender.sendMessage("$YELLOW ● Kit: $LIGHT_PURPLE${di.kit}")
+            sender.sendMessage("$YELLOW ● Warp: $LIGHT_PURPLE${di.warp}")
+            sender.sendMessage("$YELLOW ● Mechanic: $LIGHT_PURPLE${di.mechanic}")
+            sender.sendMessage("")
+
+            for (invitee in playersToDuel) {
+
+                invitee.sendMessage("")
+                invitee.sendMessage("$YELLOW${BOLD}Duel Request")
+                invitee.sendMessage("$YELLOW ● From: $GREEN${sender.name} ${GRAY}($GREEN${sender.ping} ms${GRAY})")
+                if (playersToDuel.size > 1) {
+                    var list = ""
+                    for (otherInvitee in playersToDuel.filter { it != invitee }) {
+                        val color = if (otherInvitee in di.gang) GREEN else if (otherInvitee in di.opps) RED else GRAY
+                        val ping = otherInvitee.ping
+                        list += "$color${otherInvitee.name} ${GRAY}(${PingCommand.formatMs(ping)}${ping} ms${GRAY}), "
+                    }
+                    list.removeSuffix(", ")
+                    invitee.sendMessage("$YELLOW ● Invitees: $list")
+                }
+                invitee.sendMessage("$YELLOW ● Kit: ${LIGHT_PURPLE}${di.kit}")
+                invitee.sendMessage("$YELLOW ● Map: ${LIGHT_PURPLE}${di.warp}")
+                invitee.sendMessage("$YELLOW ● Knockback: ${LIGHT_PURPLE}${di.mechanic}")
+                val acceptMsg = TextComponent("$GREEN${BOLD}(CLICK TO ACCEPT)")
+                acceptMsg.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${YELLOW}Click to accept!")))
+                acceptMsg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/accept ${sender.name}")
+                invitee.spigot().sendMessage(acceptMsg)
+            }
+        }
     }
 
     private var guiCallbacks: HashMap<UUID, Consumer<InventoryClickEvent>> = HashMap()
@@ -43,159 +85,93 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
     // - kit - if not provided make or find a GUI that can list
     // - mechanic - if not provided, list the TEMPORARY mechanic to use, may also default current if not provided, not sure
 
+
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
 
-        if (args.isEmpty()){
-            sender.sendMessage("/duel <player> <kit> <map>")
+        if (sender !is Player) {
+            sender.sendMessage("only players can initiate duels")
+            return true
+        }
+        if (args.isEmpty()) {
+            if (duels[sender] == null)
+                duels[sender] = DuelInformation()
+
+            MainMenu.listSection(
+                plugin,
+                sender,
+                mType = MenuType.StatusDuel
+            )
+//            sender.sendMessage("/duel <player> <kit> <map>")
+            return true
+        }
+        if (args[0] == "play"){
+            sender.playEffect(EntityEffect.DEATH)
+            Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                sender.teleport(sender.location)
+//                sender.closeInventory()
+            }, 40L)
+            return true
+        }
+        if (args[0] == "close"){
+            sender.closeInventory()
+            return true
+        }
+        if (args[0] == "dump") {
+            sender.sendMessage("")
+            duels[sender].toString().split(", ").forEach { sender.sendMessage(it) }
+            return true
+        }
+        if (args[0] == "clear"){
+            duels.remove(sender)
             return true
         }
         val players = Bukkit.getOnlinePlayers()
         val igns = players.map { it.name.lowercase() }
-        val playersToDuel = mutableListOf<Player>()
+        val gang = mutableSetOf<Player>()
+        val opps = mutableSetOf<Player>()
         var kit: String? = null
         var warp: String? = null
-        var knockback: String? = null
+        var mechanic: String? = null
         for (arg in args){
+            val isGang = arg.startsWith("+")
+            val arg = if (arg.startsWith("+")) arg.removePrefix("+") else arg
+
             when (arg.lowercase()) {
+
                 sender.name.lowercase() -> continue
 
                 in igns.map { it.lowercase() } -> {
-                    val player = Bukkit.getPlayer(arg) ?: run {
-                        sender.sendMessage("Failed getting online player $arg")
-                        return false
+                    val player = Bukkit.getPlayer(arg)
+                    if (player == null) {
+                        sender.sendMessage("Failed getting online player $arg..??")
+                        continue
                     }
-                    playersToDuel.add(player)
+                   if (isGang) gang.add(player)
+                   else opps.add(player) // then both teams are empty
                 }
-//                in plugin.getWarps().map { it.lowercase() } -> warp = arg
-                in WarpCommand.getWarpNamesRecursively(plugin.config.getConfigurationSection("warps")!!) -> warp = arg
-
-//                in listOf("soccer", "spawn").map { it.lowercase() } -> warp = arg
-                in plugin.config.getConfigurationSection("old-player-knockback.custom.configs")?.getKeys(false)!! -> knockback = arg
-
-//                in plugin.playerKitsAPI.getKitsManager().kits.map { it.name.lowercase() } -> kit = arg
+                in plugin.config.getConfigurationSection("warps")!! -> warp = arg
+                in plugin.config.getConfigurationSection("mechanics")?.getKeys(false)!! -> mechanic = arg
                 in plugin.config.getConfigurationSection("kits")?.getKeys(false)!! -> kit = arg
 
                 else -> sender.sendMessage("Skipping unknown ign/kit/map/kb `$arg`")
             }
         }
 //        }
-        val toRet = mutableListOf<String>()
-        if (kit == null){
-            toRet.add("You did not provide a kit")
-        }
-        if (warp == null){
-            toRet.add("You did not provide a warp")
-        }
-        if (knockback == null){
-            toRet.add("You did not provide a knockback preset")
-        }
-        if (playersToDuel.isEmpty()){
-            toRet.add("You did not provide any player(s) to duel")
-        }
-        toRet.add("")
-        toRet.add("Example: /duel couleur soccer nd ikari")
 
-        if (toRet.size > 2){
-            for(ret in toRet){
-                sender.sendMessage(ret)
-            }
-            return true
-        }
-        if (sender !is Player){
-            return true
-        }
-
-        val gui = Bukkit.createInventory(null, 9, "Choose some player(s) to duel")
-
-        var slot = 0
-        for (potentialVictim in players){
-            if (potentialVictim.name == sender.name){continue}
-            slot++
-            val item = ItemStack(Material.PLAYER_HEAD)
-            val meta = item.itemMeta as org.bukkit.inventory.meta.SkullMeta
-            meta.setOwningPlayer(potentialVictim)
-            meta.setDisplayName(potentialVictim.name)
-            item.setItemMeta(meta)
-
-            gui.setItem(slot, item)
-        }
-
-//        sender.openInventory(gui)
-        guiCallbacks[sender.uniqueId] = Consumer {
-            sender.sendMessage("You clicked an item!")
-            guiCallbacks.remove(sender.uniqueId)
-            closeCallbacks.remove(sender.uniqueId)
-        }
-//        guiCallbacks.put(sender.getUniqueId(), Any { event ->
-//            player.sendMessage("You clicked an item!")
-//            // remove callback after use
-//            guiCallbacks.remove(player.getUniqueId())
-//            closeCallbacks.remove(player.getUniqueId())
-//        })
-//
-//
-//        // Set up close handler
-//        closeCallbacks.put(player.getUniqueId(), Any {
-//            player.sendMessage("You closed the GUI.")
-//            guiCallbacks.remove(player.getUniqueId())
-//            closeCallbacks.remove(player.getUniqueId())
-//        })
-        val duelID = UUID.randomUUID()
-        duels[duelID] = DuelInformation(
-            warp!!,
-            kit!!,
-            knockback!!,
-            sender,
-            playersToDuel,
-            false
+        duels[sender] = DuelInformation(
+            warp,
+            kit,
+            mechanic,
+            gang,
+            opps
         )
-
-        for (invitee in playersToDuel){
-            invitee.sendMessage("")
-            invitee.sendMessage(
-                "$YELLOW${BOLD}Duel Request"
-            )
-            invitee.sendMessage("$YELLOW${BOLD} ● From: $GREEN${sender.name} ${GRAY}($GREEN${sender.ping} ms${GRAY})")
-            if (playersToDuel.size > 1){
-                var list: String = ""
-                for (otherInvitees in playersToDuel.filter { it != invitee }){
-                    list += "$GREEN${otherInvitees.name} ${GRAY}($GREEN${otherInvitees.ping} ms${GRAY}), "
-                }
-                list.removeSuffix(", ")
-                invitee.sendMessage("$YELLOW${BOLD} ● Invitees: $list")
-            }
-            invitee.sendMessage("$YELLOW${BOLD} ● Kit: ${LIGHT_PURPLE}$kit")
-            invitee.sendMessage("$YELLOW${BOLD} ● Map: ${LIGHT_PURPLE}$warp")
-            invitee.sendMessage("$YELLOW${BOLD} ● Knockback: ${LIGHT_PURPLE}$knockback")
-            val acceptMsg = TextComponent("$GREEN${BOLD}(CLICK TO ACCEPT)")
-            acceptMsg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/accept $duelID")
-            invitee.spigot().sendMessage(acceptMsg)
-        }
-
+        val di = duels[sender]!!
+        if (di.opps.isEmpty()) return MainMenu.listSection(plugin, sender, mType = MenuType.StatusDuel)
+        if (di.kit == null) return MainMenu.listSection(plugin, sender, mType = MenuType.KitDuel)
+        if (di.mechanic == null) return MainMenu.listSection(plugin, sender, mType = MenuType.MechanicDuel)
+        if (di.warp == null) return MainMenu.listSection(plugin, sender, mType = MenuType.WarpDuel)
+        sendDuel(sender)
         return true
-    }
-
-    @EventHandler
-    fun onInventoryClick(event: InventoryClickEvent) {
-        if (ChatColor.stripColor(event.view.title) != "Choose some player(s) to duel") return
-
-        event.isCancelled = true // prevent item pickup
-
-        val player = event.whoClicked as Player
-        val clicked = event.currentItem
-
-        if (clicked == null || clicked.type == Material.AIR) return
-
-        if (clicked.type == Material.PLAYER_HEAD) {
-            val uuid = player.uniqueId
-
-            if (guiCallbacks.containsKey(uuid)) {
-                event.isCancelled = true
-                val a = guiCallbacks[uuid]!!
-                a.accept(event)
-                player.closeInventory()
-            }
-        }
     }
 
     override fun onTabComplete(
@@ -207,12 +183,9 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
         val onlineNames = Bukkit.getOnlinePlayers()
             .filter { !it.name.equals(sender.name, true) }
             .map { it.name }
-//        val warps = listOf("soccer", "spawn")// plugin.getWarps()
         val warps = plugin.config.getConfigurationSection("warps")!!.getKeys(false)
-        val knockbacks = plugin.config.getConfigurationSection("old-player-knockback.custom.configs")?.getKeys(false)!!
-//        val kits = plugin.playerKitsAPI.getKitsManager().kits.map { it.name }
+        val knockbacks = plugin.config.getConfigurationSection("mechanics")!!.getKeys(false)
         val kits = plugin.config.getConfigurationSection("kits")?.getKeys(false)!!
-//        val kits = listOf("nd", "boxing")
 
         val suggestions: MutableList<String> = ArrayList()
 
@@ -266,26 +239,5 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
         }
 
         return suggestions
-//        Bukkit.getLogger().info("Tab complete called with args: ${args.joinToString()}")
-//
-//        val onlineNames = Bukkit.getOnlinePlayers()
-//            .filter { !it.name.equals(sender.name, true) }
-//            .map { it.name }
-//
-//        val warpNames = plugin.essentials.warps.list
-//
-//        return when {
-//            args.isEmpty() -> onlineNames
-//
-//            args.size == 1 -> onlineNames
-//                .filter { it.startsWith(args[0], ignoreCase = true) }
-//
-//            args.size >= 2 -> onlineNames
-//                .filter { it.startsWith(args.last(), ignoreCase = true) } +
-//                    warpNames
-//                .filter { it.startsWith(args.last(), ignoreCase = true) }
-//
-//            else -> emptyList()
-//        }
     }
 }
