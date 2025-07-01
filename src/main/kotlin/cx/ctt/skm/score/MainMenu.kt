@@ -14,7 +14,6 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.inventory.PrepareAnvilEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
@@ -42,6 +41,18 @@ public enum class MenuType : InventoryHolder {
 
 class MainMenu(private val plugin: Score) : Listener {
     companion object {
+        fun updateHistory(plugin: Score, historyPath: String, newValue: String) {
+            val history = plugin.config.getStringList(historyPath).apply {
+                if (isEmpty()) add(newValue)
+                else {
+                    while (contains(newValue)) remove(newValue)
+                    add(0, newValue)
+                }
+                while (size > 9) removeLast()
+            }
+            plugin.config.set(historyPath, history)
+        }
+
         fun listSection(plugin: Score, player: Player, page: Int = 1, mType: MenuType): Boolean {
 
             var sectionName = mType.name.lowercase().replace("duel", "")
@@ -52,17 +63,20 @@ class MainMenu(private val plugin: Score) : Listener {
 //                "warps" -> WarpCommand.getWarpNamesRecursively(section)
                 "status" -> Bukkit.getOnlinePlayers().map { it.uniqueId.toString() }
                 else -> section.getKeys(false)
-            }.toList()
+            }.toList().sorted()
 
             if (elements.isEmpty()) {
                 player.sendMessage("No ${section.name} found")
                 return false
             }
-            val invTitle = when (section.name) {
-                "kits" -> "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}kits are available:"
-                "warps" -> "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}warps are available:"
-                "status" -> "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}players are connected:"
-                "mechanics" -> "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}mechanics are available:"
+
+            var invTitle = ""
+            //var specialItems = mutableListOf<String>() //TODO: put first the kits/warps/mechanics created by who opened the inv
+            when (section.name) {
+                "kits" -> invTitle = "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}kits are available:"
+                "warps" -> invTitle = "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}warps are available:"
+                "status" -> invTitle = "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}players are connected:"
+                "mechanics" -> invTitle = "$DARK_PURPLE* ${elements.size} ${LIGHT_PURPLE}mechanics are available:"
                 else -> error("MainMenu#listSection: Unknown section name: ${section.name}, please implement a dedicated inventory title")
             }
 
@@ -70,6 +84,13 @@ class MainMenu(private val plugin: Score) : Listener {
 
             val itemsPerPage = 45
 
+            renderToolbar(
+                plugin,
+                player, inv,
+                currentPage = page,
+                previous = page > 1,
+                next = page * itemsPerPage < elements.size,
+            )
 
             val startIndex = (itemsPerPage * (page - 1))
             var slot = 0
@@ -81,23 +102,23 @@ class MainMenu(private val plugin: Score) : Listener {
                     "mechanics" -> {
                         val mechIcon = section.getItemStack("$el.icon") ?: ItemStack(Material.FILLED_MAP)
                         val meta = mechIcon.itemMeta!!
-                        meta.lore = emptyList()
-                        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
-                        val lore: MutableList<String> = mutableListOf()
+                        val lore = StringBuilder()
                         val creatorId = UUID.fromString(section.getString("$el.creator")!!)
                         val username = Bukkit.getPlayer(creatorId)?.name ?: Bukkit.getOfflinePlayer(creatorId).name ?: "Unknown?"
-                        lore.add("${LIGHT_PURPLE}by $DARK_PURPLE$username")
+                        lore.append("${LIGHT_PURPLE}by $DARK_PURPLE$username")
+                        lore.append(KnockbackCommand.mechHover(section.getConfigurationSection(el)!!))
 
                         if (username == player.name)
                             meta.addEnchant(Enchantment.UNBREAKING, 1, true)
                         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
+                        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
 
-                        KnockbackCommand.mechMeta.forEach { (internalKey, mechMeta) ->
-                            val mechVal = section.get("$el.values.$internalKey") ?: mechMeta.defaultValue
-                            val valColor = if (mechVal == mechMeta.defaultValue) GRAY else AQUA
-                            lore.add("${mechMeta.name}$DARK_GRAY: $valColor$mechVal")
-                        }
-                        meta.lore = lore
+//                        KnockbackCommand.mechMeta.forEach { (internalKey, mechMeta) ->
+//                            val mechVal = section.get("$el.values.$internalKey") ?: mechMeta.defaultValue
+//                            val valColor = if (mechVal == mechMeta.defaultValue) GRAY else AQUA
+//                            lore.add("${mechMeta.name}$DARK_GRAY: $valColor$mechVal")
+//                        }
+                        meta.lore = lore.toString().split("\n")
                         meta.setDisplayName("$RESET$el")
                         mechIcon.itemMeta = meta
                         inv.setItem(slot, mechIcon)
@@ -156,9 +177,9 @@ class MainMenu(private val plugin: Score) : Listener {
                         meta.owningPlayer = curPlayer
                         meta.lore = mutableListOf(
                             "",
-                            "${YELLOW}Warp: $LIGHT_PURPLE${warp}",
-                            "${YELLOW}Kit: $LIGHT_PURPLE${kit}",
-                            "${YELLOW}Knockback: $LIGHT_PURPLE${knockback}"
+                            "${DARK_PURPLE}1$GRAY:${LIGHT_PURPLE}Warp: $WHITE${warp}",
+                            "${DARK_PURPLE}2$GRAY:${LIGHT_PURPLE}Kit: $WHITE${kit}",
+                            "${DARK_PURPLE}3$GRAY:${LIGHT_PURPLE}Knockback: $WHITE${knockback}"
                         )
                         statusItem.itemMeta = meta
                         inv.setItem(slot, statusItem)
@@ -173,13 +194,7 @@ class MainMenu(private val plugin: Score) : Listener {
                 slot++
             }
 
-            renderToolbar(
-                plugin,
-                player, inv,
-                currentPage = page,
-                previous = page > 1,
-                next = page * itemsPerPage < elements.size,
-            )
+
             player.openInventory(inv)
             return true
         }
@@ -210,12 +225,20 @@ class MainMenu(private val plugin: Score) : Listener {
                 pplInfo.itemMeta = meta
                 inv.setItem(49, pplInfo)
             }
+            fun formatRecent(historyType: String): List<String>{
+                pStatus.getStringList("history.$historyType").let {
+                    if (it.isNotEmpty()) {
+                        return it.mapIndexed { i, warp -> "$DARK_PURPLE${i+1}$GRAY: $LIGHT_PURPLE$warp"}
+                    }
+                }
+                return listOf()
+            }
             run {
                 val pplInfo = ItemStack(Material.PAPER)
                 val meta = pplInfo.itemMeta!!
                 meta.setDisplayName("${AQUA}warps")
-                val curWarp = pStatus.getString("warp")
-                if (curWarp != null) meta.lore = listOf("${GRAY}${ITALIC}$curWarp")
+                val curWarp = pStatus.getString("warp") ?: "spawn"
+                meta.lore = mutableListOf("${GRAY}${ITALIC}$curWarp") + formatRecent("warp")
                 pplInfo.itemMeta = meta
                 inv.setItem(48, pplInfo)
             }
@@ -223,8 +246,8 @@ class MainMenu(private val plugin: Score) : Listener {
                 val pplInfo = ItemStack(Material.ENCHANTED_BOOK)
                 val meta = pplInfo.itemMeta!!
                 meta.setDisplayName("${AQUA}kits")
-                val curKit = pStatus.getString("kit")
-                if (curKit != null) meta.lore = listOf("${GRAY}${ITALIC}$curKit")
+                val curKit = pStatus.getString("kit") ?: "None"
+                meta.lore = listOf("${GRAY}${ITALIC}$curKit") + formatRecent("kit")
                 pplInfo.itemMeta = meta
                 inv.setItem(47, pplInfo)
             }
@@ -232,20 +255,14 @@ class MainMenu(private val plugin: Score) : Listener {
                 val pplInfo = ItemStack(Material.FILLED_MAP)
                 val meta = pplInfo.itemMeta!!
                 meta.setDisplayName("${AQUA}mechanics")
-                val curMech = pStatus.getString("mechanic")
-                if (curMech != null) meta.lore = listOf("${GRAY}${ITALIC}$curMech")
+                val curMech = pStatus.getString("mechanic") ?: "vanilla"
+                meta.lore = listOf("${GRAY}${ITALIC}$curMech") + formatRecent("mechanic")
                 pplInfo.itemMeta = meta
                 inv.setItem(50, pplInfo)
             }
             p.openInventory(inv)
             return inv
         }
-    }
-
-
-    @EventHandler
-    fun onAnvilPrepare (e: PrepareAnvilEvent) {
-        null
     }
 
     @EventHandler
@@ -255,27 +272,53 @@ class MainMenu(private val plugin: Score) : Listener {
         if (e.currentItem == null) return
         if (e.currentItem!!.type == Material.AIR) return
         e.isCancelled = true
-
         val p = e.whoClicked as Player
         val invTitle = e.view.title
         val type = MenuType.entries.first { it == e.inventory.holder }
         val isDuel = type.name.lowercase().contains("duel")
+        val duelState = if (isDuel) DuelCommand.duels[e.whoClicked] else null
 
+        var target: String? = null
+        if (e.click == ClickType.NUMBER_KEY && e.hotbarButton != -1){
+            try {
+                target = e.currentItem!!.itemMeta!!.lore?.first { stripColor(it).startsWith("${e.hotbarButton + 1}: ") }
+                target = stripColor(target)?.split(": ")?.last()
+            } catch (_: Exception) {
+                // suppressing in case e.g.: there's 3 recent warps and user types 4
+            }
+        }
         var clickedToolbar = true
         when (e.slot) {
-            45, 53 -> if (e.currentItem!!.type == Material.ARROW)
-                  listSection(plugin,p, page = stripColor(e.currentItem!!.itemMeta!!.displayName).toInt(), type)
-            47 -> listSection(plugin, p, mType = (if (isDuel) MenuType.Kit else MenuType.KitDuel))
-            48 -> listSection(plugin, p, mType = (if (isDuel) MenuType.Warp else MenuType.WarpDuel))
-            49 -> listSection(plugin, p, mType = (if(isDuel) MenuType.Status else MenuType.StatusDuel))
-            50 -> listSection(plugin, p, mType = (if(isDuel) MenuType.Mechanic else MenuType.MechanicDuel))
-            else -> clickedToolbar = false
+            45, 53 -> {
+                if (e.currentItem!!.type == Material.ARROW)
+                    listSection(plugin,p, page = stripColor(e.currentItem!!.itemMeta!!.displayName).toInt(), type)
+            }
+            47 -> {
+                if (target == null)
+                listSection(plugin, p, mType = (if (isDuel) MenuType.Kit else MenuType.KitDuel))
+                else Kit.loadKit(plugin, p, target)
+            }
+            48 -> {
+                if (target == null)
+                listSection(plugin, p, mType = (if (isDuel) MenuType.Warp else MenuType.WarpDuel))
+                else WarpCommand.teleportToWarp(plugin, p, target)
+            }
+            49 -> {
+                listSection(plugin, p, mType = (if(isDuel) MenuType.Status else MenuType.StatusDuel))
+            }
+            50 -> {
+                if (target == null)
+                listSection(plugin, p, mType = (if(isDuel) MenuType.Mechanic else MenuType.MechanicDuel))
+                else KnockbackCommand.setMechanic(p, target, plugin)
+            }
+            else -> {
+                clickedToolbar = false
+            }
         }
-        if (clickedToolbar) return
-
-        // this is a very cursed way to check if the inventory is a duel
-        // this makes it more convenient to check if it's a duel without needing unnecessary hashmap!!.key indexing
-        val duelState = if (isDuel) DuelCommand.duels[e.whoClicked] else null
+        if (clickedToolbar) {
+            p.updateInventory() // this is a hotfix until cancelling an InventoryClickEvent reverts the swapped item
+            return
+        }
 
         when (type){
             MenuType.Kit, MenuType.KitDuel -> {
@@ -294,7 +337,7 @@ class MainMenu(private val plugin: Score) : Listener {
                             duelState.kit = kitName
                             if (duelState.opps.isEmpty())
                                 listSection(plugin, p, mType = MenuType.StatusDuel)
-                            else sendDuel(p)
+                            else sendDuel(p, plugin)
                         }
                     }
 
@@ -306,7 +349,7 @@ class MainMenu(private val plugin: Score) : Listener {
                             if (duelState.opps.isEmpty()) listSection(plugin, p, mType = MenuType.StatusDuel)
                             else if (duelState.warp == null) listSection(plugin,p, mType = MenuType.WarpDuel)
                             else if (duelState.mechanic == null) listSection(plugin,p, mType = MenuType.MechanicDuel)
-                            else sendDuel(p)
+                            else sendDuel(p, plugin)
                         }
                     }
 
@@ -330,7 +373,7 @@ class MainMenu(private val plugin: Score) : Listener {
                             p,
                             mType = MenuType.StatusDuel
                         )
-                        else sendDuel(p)
+                        else sendDuel(p, plugin)
                     } else if (e.click == ClickType.RIGHT) {
                         if (duelState.opps.isEmpty()) listSection(
                             plugin,
@@ -347,7 +390,7 @@ class MainMenu(private val plugin: Score) : Listener {
                             p,
                             mType = MenuType.MechanicDuel
                         )
-                        else sendDuel(p)
+                        else sendDuel(p, plugin)
                     }
                 }
             }
@@ -357,26 +400,34 @@ class MainMenu(private val plugin: Score) : Listener {
                     plugin.logger.info("how tf did ${e.whoClicked} click slot ${e.slot}?")
                     return
                 }
-                val lore = e.currentItem?.itemMeta?.lore
+                val lore = e.currentItem?.itemMeta?.lore?.map { stripColor(it) }
                 if (lore == null) {
                     plugin.logger.warning("${e.whoClicked} clicked a player head without lore..??")
                     return
                 }
+                var clickType = e.click
+                if (e.hotbarButton != -1){
+                    when (e.hotbarButton+1) {
+                        1 -> clickType = ClickType.LEFT // warp
+                        2 -> clickType = ClickType.SHIFT_LEFT // kit
+                        3 -> clickType = ClickType.RIGHT // mechanic/knockback
+                    }
+                }
 
                 if (duelState == null)
-                    when (e.click) {
+                    when (clickType) {
                         ClickType.LEFT -> {
-                            val warp = lore[0].replace("Warp: §b", "")
+                            val warp = lore.first{it.contains("Warp: ")}.split(": ").last()
                             WarpCommand.teleportToWarp(plugin, p, warp)
                         }
 
                         ClickType.SHIFT_LEFT -> {
-                            val warp = lore[1].replace("Kit: §b", "")
+                            val warp = lore.first{it.contains("Kit: ")}.split(": ").last()
                             Kit.loadKit(plugin, p, warp)
                         }
 
                         ClickType.RIGHT -> {
-                            val warp = lore[2].replace("Knockback: §b", "")
+                            val warp = lore.first{it.contains("Knockback: ")}.split(": ").last()
                             KnockbackCommand.setMechanic(p, warp, plugin)
                         }
                         else -> return
@@ -417,7 +468,7 @@ class MainMenu(private val plugin: Score) : Listener {
                                     p,
                                     mType = MenuType.KitDuel
                                 )
-                            else sendDuel(p)
+                            else sendDuel(p, plugin)
                         }
                         ClickType.RIGHT -> {
                             e.whoClicked.sendMessage("Left-click to duel a single player")
@@ -429,7 +480,7 @@ class MainMenu(private val plugin: Score) : Listener {
                                 e.whoClicked.sendMessage("The opponent team is empty")
                                 return
                             }
-                            sendDuel(p)
+                            sendDuel(p, plugin)
                         }
 
                         ClickType.SHIFT_LEFT -> {
@@ -477,7 +528,7 @@ class MainMenu(private val plugin: Score) : Listener {
                                 p,
                                 mType = MenuType.StatusDuel
                             )
-                            else sendDuel(p)
+                            else sendDuel(p, plugin)
                         }
                     }
                     ClickType.RIGHT -> {
@@ -500,7 +551,7 @@ class MainMenu(private val plugin: Score) : Listener {
                                 p,
                                 mType = MenuType.KitDuel
                             )
-                            else sendDuel(p)
+                            else sendDuel(p, plugin)
                         }
                     }
                     else -> {}

@@ -5,10 +5,16 @@ api-version: '1.21'
 softdepend: [Essentials, PlayerKits2]
 author: [Couleur]
 description: "a simple core for skm"
-libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20']
+libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20',
+
+            'org.jetbrains.kotlin:kotlin-reflect:2.1.20'
+]
 
 commands:
 
+    itemperks:
+      description: change item abilities
+      aliases: [ip]
     playerstatus:
       description: get information about online players
       aliases: [ps, pstatus]

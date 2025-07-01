@@ -14,10 +14,39 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerTeleportEvent
+import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.*
 
 class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCompleter {
     private val conf = plugin.config
     companion object {
+//        fun listPlayerStatus(plugin: Score, player: Player, duel: Boolean = false) {
+//            val mType = if (duel) MenuType.PlayerStatusDuel else MenuType.PlayerStatus
+//            val inv = Bukkit.createInventory(mType, 54, "${DARK_PURPLE}* ${Bukkit.getOnlinePlayers().size} ${LIGHT_PURPLE}players are connected:")
+//
+//            val a = plugin.config
+//            val players = plugin.config.getConfigurationSection("status")!!.getKeys(false).filter { Bukkit.getPlayer(UUID.fromString(it)) != null }
+//            for ((i, playerName) in  players.withIndex()) {
+//                val pstatus = plugin.config.getConfigurationSection("status.$playerName")!!
+//                val warp = pstatus.getString("warp")!!
+//                val kit = pstatus.getString("kit")!!
+//                val knockback = pstatus.getString("knockback")!!
+//
+//                val statusItem = ItemStack(Material.PLAYER_HEAD)
+//                val meta = statusItem.itemMeta!! as org.bukkit.inventory.meta.SkullMeta
+//                val playerPlayer = Bukkit.getPlayer(UUID.fromString(playerName)) ?: continue
+//                meta.setDisplayName("$AQUA${playerPlayer.name}")
+//                meta.setOwningPlayer(playerPlayer)
+//                val lore = mutableListOf<String>()
+//                lore.add("${RESET}Warp: $AQUA${warp}")
+//                lore.add("${RESET}Kit: $AQUA${kit}")
+//                lore.add("${RESET}Knockback: $AQUA${knockback}")
+//                meta.lore = lore
+//                statusItem.itemMeta = meta
+//                inv.setItem(i, statusItem)
+//            }
+//            MainMenu.renderToolbar(plugin, player, inv)
+//            player.openInventory(inv)
+//        }
     }
 
     @EventHandler
@@ -57,6 +86,7 @@ class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCom
     @EventHandler
     fun onPlayerTeleport(event: PlayerTeleportEvent) {
         val player = event.player
+        if (event.cause !in listOf(COMMAND, PLUGIN, SPECTATE)) return
         if (event.to == null) {
             event.player.sendMessage("You have teleported to an unknown location, how did that happen?")
             return
@@ -72,8 +102,6 @@ class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCom
             } else {
                 player.sendMessage("You have teleported to ${p.name}, but they have no last warp set.")
             }
-        } else {
-            plugin.logger.info("to: ${event.to.toString()}")
         }
     }
 

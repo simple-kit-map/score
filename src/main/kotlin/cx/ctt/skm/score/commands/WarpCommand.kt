@@ -72,12 +72,14 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                     if (name.lowercase() in Bukkit.getOnlinePlayers().map { it.name.lowercase() })
                         player.teleport(Bukkit.getPlayer(name)!!.location)
                     else
-                        player.sendMessage("Failed getting warp $name")
+                        player.sendMessage("Failed getting warp $name, are you sure it exists?")
 
-                    return true
+                    return false
                 })
 
             plugin.config.set("status.${player.uniqueId}.warp", name)
+
+            MainMenu.updateHistory(plugin, "status.${player.uniqueId}.history.warp", name)
             if (label == "warp-f") {
                 val followMsg = TextComponent("$DARK_GRAY${player.name.lowercase()}->$name")
                 followMsg.hoverEvent =
@@ -86,8 +88,8 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                 Bukkit.spigot().broadcast(followMsg)
             } else if (!label.endsWith("-s")){
                 val msg =
-                    TextComponent("${DARK_PURPLE}* ${player.name} ${LIGHT_PURPLE}warped to ${GRAY}[$GREEN$name${GRAY}]")
-                msg.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${GREEN}Click me to warp to $name!")))
+                    TextComponent("${DARK_PURPLE}* ${player.name} ${LIGHT_PURPLE}tped to ${DARK_PURPLE}warp $GRAY[$GREEN$BOLD$name$GRAY]")
+                msg.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${LIGHT_PURPLE}Click me to warp to $DARK_PURPLE$name!")))
                 msg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-f $name")
                 Bukkit.spigot().broadcast(msg)
             }
@@ -146,8 +148,8 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
                 return true
             }
             val msg = TextComponent("$DARK_PURPLE* ${sender.name} ${LIGHT_PURPLE}created warp ")
-            val name = TextComponent("${GRAY}[$GREEN${args[0]}${GRAY}]")
-            name.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${GREEN}Click me to warp to $name!")))
+            val name = TextComponent("$GRAY[$GREEN$BOLD${args[0]}${GRAY}]")
+            name.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${GREEN}Click me to warp to ${args[0]}!")))
             name.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/warp-f ${args[0]}")
             msg.addExtra(name)
             Bukkit.spigot().broadcast(msg)
@@ -234,9 +236,7 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
         sender: CommandSender, command: Command, label: String, args: Array<out String>
     ): List<String> {
         if (args.isEmpty()) return listOf()
-
-        val warps =
-            getWarpNamesRecursively(plugin.config.getConfigurationSection("warps")!!) ?: error("warp section is empty")
+        val warps = getWarpNamesRecursively(plugin.config.getConfigurationSection("warps")!!)
         val last = args.last()
         return when (args.size) {
             // only show subwarps when a dot is typed

@@ -33,10 +33,43 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
 
     companion object {
         var duels: HashMap<Player, DuelInformation> = HashMap()
-        fun sendDuel(sender: Player) {
+        fun sendDuel(sender: Player, plugin: Score) {
             sender.closeInventory()
             val di = duels[sender] ?: error("Attempted to start duel with unknown duel ID ${sender.name}")
             val playersToDuel = di.gang + di.opps
+
+            if (di.opps.isEmpty()){
+                sender.sendMessage("Failed to sent a duel request, there are no opponents..?")
+                return
+            }
+            val pStatus = plugin.config.getConfigurationSection("status.${sender.uniqueId}") ?: error("${sender.name}'s sendDuel: Could not find player status section.")
+            if (di.kit == null){
+                val curKit = pStatus.getString("kit") ?: "none"
+                if (curKit.equals("none", true)){
+                    sender.sendMessage("Failed to send a duel request, no kit was selected")
+                    return
+                }
+                sender.sendMessage("${GRAY}duel$DARK_GRAY: No kit was selected, using current kit $DARK_GRAY$curKit")
+                di.kit = curKit
+            }
+            if (di.warp == null){
+                val curWarp = pStatus.getString("warp") ?: "spawn"
+                if (curWarp.equals("spawn", true)) {
+                    val randWarp = plugin.config.getConfigurationSection("warps")!!.getKeys(false).random()
+                    sender.sendMessage("${GRAY}duel$DARK_GRAY: No warp was selected, picked out random warp $DARK_GRAY$randWarp")
+                    di.warp = randWarp
+                } else {
+                    sender.sendMessage("${GRAY}duel$DARK_GRAY: No warp was selected, using current $DARK_GRAY$curWarp")
+                    di.warp = curWarp
+                }
+            }
+            if (di.mechanic == null){
+
+                val curMech = pStatus.getString("mechanic") ?: "vanilla"
+
+                sender.sendMessage("${GRAY}duel$DARK_GRAY: No knockback ewas selected, using current $DARK_GRAY$curMech")
+                di.mechanic = curMech
+            }
 
             sender.sendMessage("")
             sender.sendMessage("$YELLOW${BOLD}Duel Sent")
@@ -170,7 +203,7 @@ class DuelCommand (private val plugin: Score): CommandExecutor, TabCompleter, Li
         if (di.kit == null) return MainMenu.listSection(plugin, sender, mType = MenuType.KitDuel)
         if (di.mechanic == null) return MainMenu.listSection(plugin, sender, mType = MenuType.MechanicDuel)
         if (di.warp == null) return MainMenu.listSection(plugin, sender, mType = MenuType.WarpDuel)
-        sendDuel(sender)
+        sendDuel(sender, plugin)
         return true
     }
 

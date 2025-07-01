@@ -75,10 +75,12 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
         /** helo i give you player i fill his inv and yap abt it :) **/
         fun loadKit(plugin: Score, player: Player, name: String, label: String = "kit"): Boolean {
 
+
             val kitName = name.split(".")[0]
             val kit = plugin.config.getConfigurationSection("kits.$kitName") ?: error("Failed getting kit $name")
             plugin.config.set("status.${player.uniqueId}.kit", name)
             kit["uses"] = kit.getInt("uses") + 1
+            MainMenu.updateHistory(plugin, "status.${player.uniqueId}.history.kit", kitName)
 
 //        val armors = kit.get("armor")!!
 //        val armorsDone = when (armors) {
@@ -109,8 +111,8 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
                 msg.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit-f $name")
                 Bukkit.spigot().broadcast(msg)
             } else if (label != "kit-s") {
-                val msg = TextComponent("$DARK_PURPLE* ${player.name} ${LIGHT_PURPLE}switched to ${DARK_PURPLE}kit ")
-                val claimButton = TextComponent("$GRAY[$GREEN$name$GRAY]")
+                val msg = TextComponent("$DARK_PURPLE* ${player.name} ${LIGHT_PURPLE}equipped ${DARK_PURPLE}kit ")
+                val claimButton = TextComponent("$GRAY[$GREEN$BOLD$name$GRAY]")
                 claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit-f $name")
                 msg.addExtra(claimButton)
                 Bukkit.spigot().broadcast(msg)
@@ -695,7 +697,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
         }
 
         val msg = TextComponent("$DARK_PURPLE* ${player.name} ${LIGHT_PURPLE}created kit ")
-        val claimButton = TextComponent("$GRAY[$GREEN$name$GRAY]")
+        val claimButton = TextComponent("$GRAY[$GREEN$BOLD$name$GRAY]")
         claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit preview $name")
 //        claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/kit open $name}")
         msg.addExtra(claimButton)

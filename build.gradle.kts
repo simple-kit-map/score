@@ -25,6 +25,7 @@ dependencies {
     implementation("net.essentialsx:EssentialsX:2.21.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("net.kyori:adventure-api:4.22.0")
     implementation(files("..\\PlayerKits2\\target\\PlayerKits2-1.0-SNAPSHOT.jar"))
 }
 

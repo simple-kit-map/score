@@ -62,7 +62,6 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
         projDirection.normalize()
         direction.multiply(min(originalMagnitude, 0.502))
         projectile.velocity = direction
-        (event.entity.shooter as Player).sendMessage("velo \"direction\" is ${direction.toString()}")
     }
 }
     @EventHandler

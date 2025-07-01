@@ -44,6 +44,11 @@ class Score : JavaPlugin() {
                 config.createSection(mainSection);
             }
         }
+        val ip = ItemPerks(this)
+        server.pluginManager.registerEvents(ItemPerks(this), this)
+        getCommand("itemperks")?.setExecutor(ItemPerks(this))
+        getCommand("itemperks")?.tabCompleter = ItemPerks(this)
+
         val ps = PlayerStatus(this)
         getCommand("playerstatus")?.setExecutor(ps)
         getCommand("playerstatus")?.tabCompleter = ps

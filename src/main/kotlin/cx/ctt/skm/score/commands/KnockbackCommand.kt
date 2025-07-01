@@ -3,6 +3,7 @@ package cx.ctt.skm.score.commands
 import cx.ctt.skm.score.MainMenu
 import cx.ctt.skm.score.MenuType
 import cx.ctt.skm.score.Score
+import net.md_5.bungee.api.ChatColor
 import net.md_5.bungee.api.chat.ClickEvent
 import net.md_5.bungee.api.chat.HoverEvent
 import net.md_5.bungee.api.chat.TextComponent
@@ -13,6 +14,7 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
+import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryType
 import org.bukkit.inventory.ItemStack
@@ -35,11 +37,37 @@ enum class SET {
     set, select, choose, pick, switch
 }
 
+enum class CPY {
+    copy, cp, duplicate, dupe, fork
+}
+
 class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabCompleter {
     private val conf
         get() = plugin.config
 
     companion object {
+
+        // used by listSections for mechanics and /kb create and /kb set through mechLore()
+        fun mechHover(sect: ConfigurationSection): StringBuilder {
+            val ret = StringBuilder()
+            var index = 0
+            val size = mechMeta.keys.size
+            mechMeta.forEach { (internalKey, mechMeta) ->
+
+                val mechVal = sect.get("values.$internalKey") ?: mechMeta.defaultValue
+                val valColor = if (mechVal == mechMeta.defaultValue) ChatColor.DARK_GRAY else ChatColor.AQUA
+                ret.append("${mechMeta.name}${ChatColor.GRAY}: $valColor$mechVal")
+                if (index < size-1) ret.append("\n")
+                index++
+            }
+            return ret
+        }
+        fun mechLore(sect: ConfigurationSection): Array<TextComponent> {
+            val creatorId = UUID.fromString(sect.getString("creator")!!)
+            val player = Bukkit.getPlayer(creatorId)?.name ?: Bukkit.getOfflinePlayer(creatorId).name
+            val username = player ?: "Unknown???"
+            return arrayOf(TextComponent("$BOLD${sect.name} ${WHITE}by $AQUA$username\n" + mechHover(sect) + "\n${AQUA}Click to switch!"))
+        }
 
         data class MechInfo(
             val slot: Int,
@@ -107,14 +135,14 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
 
             "netheritekbresistance" to MechInfo(49, "Netherite KB resistance", 10, listOf("Percentage of armor reduction per netherite armor slot")),
         )
-        fun castValue(value: String, defaultValue: Any, valueName: String, mechName: String): Any {
+        fun castValue(value: String, defaultValue: Any, metaKey: String, mechName: String): Any {
             val value = when (defaultValue) {
                 is Boolean -> value.toBooleanStrictOrNull()
                 is Double -> value.toDoubleOrNull()
                 is Float -> value.toFloatOrNull()
                 is Int -> value.toIntOrNull()
                 else -> error("Unsupported type ${defaultValue::class.simpleName}")
-            } ?: error("${mechName}: invalid default value $value for $valueName, which defaults to $defaultValue of type ${defaultValue::class.simpleName}")
+            } ?: error("${mechName}: invalid default value $value for $metaKey, which defaults to $defaultValue of type ${defaultValue::class.simpleName}")
             return value
         }
 
@@ -181,20 +209,25 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
         // apply a mechanic to a player
         fun setMechanic(sender: Player, mech: String, plugin: Score, label: String = "mech"): Boolean {
 
+            if (mech !in plugin.config.getConfigurationSection("mechanics")!!.getKeys(false)){
+                sender.sendMessage("$label $mech does not exist")
+                error("${sender.name} tried claiming mechanic $mech")
+            }
+
             if (label.endsWith("-f")){
                 Bukkit.broadcastMessage("${DARK_GRAY}${sender.name.lowercase()}=$mech")
             } else if(!label.endsWith("-s")){
 
                 val msg = TextComponent("${DARK_PURPLE}* ${sender.name} ${LIGHT_PURPLE}switched to ${DARK_PURPLE}mech ")
 
-                val claimButton = TextComponent("$GRAY[$GREEN$mech$GRAY]")
+                val claimButton = TextComponent("$GRAY[$GREEN$BOLD$mech$GRAY]")
                 claimButton.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent("${DARK_GRAY}mech $mech")))
                 claimButton.clickEvent = ClickEvent(ClickEvent.Action.RUN_COMMAND, "/mech-f $mech")
-                var desc = mech
-                for ((_, meta) in mechMeta){
-                    desc += "\n${meta.name}${GRAY}: ${AQUA}${plugin.config.get("mechanics.$mech.values.${meta.name.lowercase().replace(" ", "")}")}${RESET}"
-                }
-                claimButton.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, arrayOf(TextComponent(desc)))
+//                val sb = java.lang.StringBuilder()
+//                sb.append(mechHover(plugin.config.getConfigurationSection("mechanics.$mech")!!))
+//
+//                val desc = arrayOf(TextComponent("$BOLD$mech" + "\n" + sb + "\n${AQUA}Click to switch!"))
+                claimButton.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, mechLore(plugin.config.getConfigurationSection("mechanics.$mech")!!))
                 msg.addExtra(claimButton)
 
                 val hd = plugin.config.getInt("mechanics.$mech.values.hitdelay", 20)
@@ -205,13 +238,14 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
             }
 
             plugin.config.set("status.${sender.uniqueId}.mechanic", mech)
+
+            MainMenu.updateHistory(plugin, "status.${sender.uniqueId}.history.mechanic", mech)
             return true
         }
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
 
-        plugin.logger.info (plugin.config.getString("status.${(sender as Player).uniqueId}.mechanic"))
         val args = args.map { it.lowercase() }.toMutableList()
         val sender = if (sender !is Player) {
             val pl = Bukkit.getPlayer(args.removeAt(0))
@@ -228,7 +262,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
 
         val kitBlacklist: MutableSet<String> = mutableSetOf()
 
-        listOf(NEW.entries, DEL.entries, LIST.entries, SET.entries).forEach { subcommand ->
+        listOf(NEW.entries, DEL.entries, LIST.entries, SET.entries, CPY.entries).forEach { subcommand ->
             kitBlacklist.addAll(subcommand.map { it.name })
         }
         if (args.isEmpty()){
@@ -246,6 +280,41 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
         }
 
         when (val first = args[0]) {
+            in CPY.entries.map{ it.name } -> {
+                if (args.size != 3){
+                    sender.sendMessage("/$label $first <existing kb u wanna copy> <name of new copy")
+                    return true
+                }
+                val originalName = args[1]
+                val mechName = args[2]
+                if (originalName !in mechs) {
+                    sender.sendMessage("$label $originalName does not exist")
+                    return true
+                }
+                if (mechName in mechs) {
+                    val bCreator = plugin.config.getString("mechanics.$mechName.creator")
+                    if (sender.uniqueId.toString() == bCreator){
+                        sender.sendMessage("squashing existing $label $mechName")
+                    } else {
+                        sender.sendMessage("$label $mechName already exists")
+                        return true
+                    }
+                }
+
+                val originalMech = plugin.config.getConfigurationSection("mechanics.$originalName.values")!!.getKeys(false)
+                val mech = plugin.config.createSection("mechanics.$mechName")
+                for ((key, value) in originalMech.withIndex()){
+                    mech.set("values.$key", value)
+                }
+                plugin.config.set("mechanics.$mechName", originalMech)
+                mech.set("creator", sender.uniqueId.toString())
+                mech.set("created", System.currentTimeMillis())
+
+                conf.set("status.${sender.uniqueId}.mechanic", mechName)
+                plugin.saveConfig()
+                Bukkit.spigot().broadcast(TextComponent("${DARK_PURPLE}* ${sender.name} ${LIGHT_PURPLE}copied mechanic $originalName ${DARK_PURPLE}$mechName"))
+                return true
+            }
             "setvalue", "setval" -> {
                 if (args.size == 1){
                     sender.sendMessage("missing $label name and value")
@@ -295,6 +364,7 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                     return true
                 }
                 //! TODO: check type castable
+                val typedValue = castValue(value, mechMeta[key]!!.defaultValue, key, mechName)
                 sect.set(key, value)
                 sender.sendMessage("$label set $mechName.$key to $value")
 
@@ -383,23 +453,25 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
 
 //                val typedArgs = mutableListOf<Any>()
                 var index = 0
-                for ((_, meta) in mechMeta){
+                for ((metaKey, meta) in mechMeta){
 //                mechMeta2.foreach {(_, meta) ->
 
-                    val value = when (meta.defaultValue) {
-                        is Boolean -> args[index].toBooleanStrictOrNull()
-                        is Double -> args[index].toDoubleOrNull()
-                        is Float -> args[index].toFloatOrNull()
-                        is Int -> args[index].toIntOrNull()
-                        else ->
-                            error("invalid default value for ${meta.name}, ${meta.defaultValue} of type ${meta.defaultValue::class.simpleName}")
-                    }
-                    if (value == null){
-                        sender.sendMessage("${LIGHT_PURPLE}Invalid input value for ${DARK_PURPLE}${meta.name}${LIGHT_PURPLE}, ${RED}${args[index]} ${LIGHT_PURPLE}is not a valid ${DARK_PURPLE}${meta.defaultValue::class.simpleName}")
-                        conf.set("mechanics.$mechName", null)
-                        return true
-                    }
-                    conf.set("mechanics.$mechName.values.${meta.name.lowercase().replace(" ", "")}", value)
+
+//                    val value = when (meta.defaultValue) {
+//                        is Boolean -> args[index].toBooleanStrictOrNull()
+//                        is Double -> args[index].toDoubleOrNull()
+//                        is Float -> args[index].toFloatOrNull()
+//                        is Int -> args[index].toIntOrNull()
+//                        else ->
+//                            error("invalid default value for ${meta.name}, ${meta.defaultValue} of type ${meta.defaultValue::class.simpleName}")
+//                    }
+//                    if (value == null){
+//                        sender.sendMessage("${LIGHT_PURPLE}Invalid input value for ${DARK_PURPLE}${meta.name}${LIGHT_PURPLE}, ${RED}${args[index]} ${LIGHT_PURPLE}is not a valid ${DARK_PURPLE}${meta.defaultValue::class.simpleName}")
+//                        conf.set("mechanics.$mechName", null)
+//                        return true
+//                    }
+                    val mechValue = castValue(args[index], meta.defaultValue, metaKey, mechName)
+                    conf.set("mechanics.$mechName.values.${meta.name.lowercase().replace(" ", "")}", mechValue)
 //                    typedArgs.add(value)
                     index++
                 }
@@ -656,24 +728,35 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
     ): List<String> {
 
         val mechs = plugin.config.getConfigurationSection("mechanics")?.getKeys(false)!!
-        when (args.size) {
-            1 -> {
-                val configs = mutableListOf("list", "add", "del")
-                configs.addAll(mechs)
-                return configs.filter { it.startsWith(args[0]) }
-            }
 
-            2 -> {
-                when (args[0]){
-                    in DEL.entries.map { it.name } -> {
-                        return if (sender is Player) {
-                            mechs.filter {
-                                plugin.config.getString("mechanics.${it}.creator")!! == sender.uniqueId.toString()
-                            }
-                        } else {
-                            mechs.toList()
-                        }
+        if (args.size == 1) {
+            val configs = mutableListOf("list", "new", "del", "copy", "setvalue")
+            configs.addAll(mechs)
+            return configs.filter { it.startsWith(args[0]) }
+        }
+        val first = args[0]
+        val second = args[1]
+        when {
+            args.size == 2 && first in DEL.entries.map {it.name} -> {
+                return if (sender is Player) {
+                    mechs.filter {
+                        plugin.config.getString("mechanics.${it}.creator") == sender.uniqueId.toString()
                     }
+                } else {
+                    mechs.toList()
+                }
+            }
+            first in listOf("setvalue", "setval") -> {
+                if (args.size == 2)
+                    return mechs.toList().filter { it.startsWith(args.last()) }
+
+                if (args.size == 3)
+                    return mechMeta.entries.map { it.key}.filter { it.startsWith(args.last()) }
+
+                val value = args[2]
+                if (args.size == 4){
+                    if (value !in mechMeta.entries.map { it.key }) return listOf("")
+                    return listOf(plugin.config.getString("mechanics.$second.values.$value") ?: mechMeta[value]?.defaultValue.toString())
                 }
             }
         }

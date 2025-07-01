@@ -81,7 +81,6 @@ class Knockback(val plugin: Score): Listener {
         val constructor = KnockbackCommand.Companion.MechData::class.constructors.first()
 
         val typed = fixedArray.toTypedArray()
-        event.entity.sendMessage(typed.joinToString(" "))
         val a = constructor.call(*typed)
 
 
