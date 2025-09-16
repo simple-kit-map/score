@@ -52,6 +52,13 @@ class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCom
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
 
+        val cb = Bukkit.getPluginManager().getPlugin("CheatBreakerAPI")
+        if (cb != null)
+        {
+            val method = cb.javaClass.getMethod("giveAllStaffModules", Player::class.java)
+            method.invoke(cb, event.player)
+        }
+
         val player = event.player
         var warp = conf.getString("status.${player.uniqueId}.warp")
         val kit = conf.getString("status.${player.uniqueId}.kit") ?: "None"
@@ -106,6 +113,26 @@ class PlayerStatus(private val plugin: Score): Listener, CommandExecutor, TabCom
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
+        val target: Player
+        if (args.isNotEmpty() && args[0] == "info") {
+            target = if (args.size == 1 && sender is Player) {
+                sender
+            } else {
+                Bukkit.getPlayer(args[1]) ?: run {
+                    sender.sendMessage("${args[1]} not exists/online")
+                    return false
+                }
+            }
+            sender.sendMessage("Health: ${target.health}")
+            sender.sendMessage("Damage tick: ${target.maximumNoDamageTicks}")
+            sender.sendMessage("Damage tick: ${target.noDamageTicks}")
+            sender.sendMessage("Ping: ${target.ping}")
+            sender.sendMessage("Warp: " + conf.getString("status.${target.uniqueId}.warp"))
+            sender.sendMessage("Kit: " + conf.getString("status.${target.uniqueId}.kit"))
+            sender.sendMessage("Mech: " + conf.getString("status.${target.uniqueId}.mechanic"))
+            sender.sendMessage("")
+            return true
+        }
         if (sender !is Player) return true
         return listSection(plugin, sender, mType = MenuType.Status)
     }
