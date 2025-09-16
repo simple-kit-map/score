@@ -71,6 +71,7 @@ class Score : JavaPlugin() {
         getCommand("hide")?.setExecutor(HideCommand(this))
         getCommand("ping")?.setExecutor(PingCommand(this))
         getCommand("accept")?.setExecutor(AcceptCommand(this))
+        getCommand("cap")?.setExecutor(CapCommand(this))
 
         server.pluginManager.registerEvents(Listeners(this), this);
         server.pluginManager.registerEvents(DeathHandler(this), this)
