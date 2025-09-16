@@ -214,6 +214,10 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                 error("${sender.name} tried claiming mechanic $mech")
             }
 
+            val hd = plugin.config.getInt("mechanics.$mech.values.hitdelay", 20)
+            sender.maximumNoDamageTicks = hd
+            sender.noDamageTicks = hd
+
             if (label.endsWith("-f")){
                 Bukkit.broadcastMessage("${DARK_GRAY}${sender.name.lowercase()}=$mech")
             } else if(!label.endsWith("-s")){
@@ -229,10 +233,6 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
 //                val desc = arrayOf(TextComponent("$BOLD$mech" + "\n" + sb + "\n${AQUA}Click to switch!"))
                 claimButton.hoverEvent = HoverEvent(HoverEvent.Action.SHOW_TEXT, mechLore(plugin.config.getConfigurationSection("mechanics.$mech")!!))
                 msg.addExtra(claimButton)
-
-                val hd = plugin.config.getInt("mechanics.$mech.values.hitdelay", 20)
-                sender.maximumNoDamageTicks = hd
-                sender.noDamageTicks = hd
 
                 Bukkit.spigot().broadcast(msg)
             }
@@ -300,15 +300,14 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                         return true
                     }
                 }
+                val newMech = plugin.config.createSection("mechanics.$mechName")
+                newMech.set("creator", sender.uniqueId.toString())
+                newMech.set("created", System.currentTimeMillis())
 
-                val originalMech = plugin.config.getConfigurationSection("mechanics.$originalName.values")!!.getKeys(false)
-                val mech = plugin.config.createSection("mechanics.$mechName")
-                for ((key, value) in originalMech.withIndex()){
-                    mech.set("values.$key", value)
+                val originalKeys = plugin.config.getConfigurationSection("mechanics.$originalName.values")!!.getKeys(false)
+                for (key in originalKeys){
+                    newMech.set("values.$key", plugin.config.get("mechanics.$originalName.values.$key"))
                 }
-                plugin.config.set("mechanics.$mechName", originalMech)
-                mech.set("creator", sender.uniqueId.toString())
-                mech.set("created", System.currentTimeMillis())
 
                 conf.set("status.${sender.uniqueId}.mechanic", mechName)
                 plugin.saveConfig()
