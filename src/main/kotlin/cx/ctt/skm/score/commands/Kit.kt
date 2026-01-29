@@ -633,7 +633,7 @@ class Kit(private val plugin: Score) : CommandExecutor, TabCompleter, Listener {
         if (part in listOf(KitPart.NEWKIT, KitPart.INVENTORY)) {
             val dedupMap: HashMap<ItemStack, MutableList<Int>> = HashMap()
 //            player.sendMessage(player.inventory.contents.size.toString())
-            for ((index, item) in player.inventory.contents.withIndex()) {
+            for ((index, item) in player.inventory.contents.copyOf().withIndex()) {
                 if (item == null) continue
                 if (item.type == Material.AIR) continue
                 if (dedupMap.contains(item)) {
