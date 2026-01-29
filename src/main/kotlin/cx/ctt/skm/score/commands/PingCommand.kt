@@ -3,8 +3,6 @@ package cx.ctt.skm.score.commands
 import cx.ctt.skm.score.Score
 import net.md_5.bungee.api.ChatColor
 import net.md_5.bungee.api.ChatColor.*
-import net.md_5.bungee.api.chat.ClickEvent
-import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
@@ -42,9 +40,9 @@ companion object {
                 }
             }
         }
-        val txt = TextComponent("skm is hosted in New York, USA on ${AQUA}sear.host")
-        txt.clickEvent = ClickEvent(ClickEvent.Action.OPEN_URL, "https://sear.host")
-        sender.spigot().sendMessage(txt)
+//        val txt = TextComponent("skm is hosted in New York, USA on ${AQUA}sear.host")
+//        txt.clickEvent = ClickEvent(ClickEvent.Action.OPEN_URL, "https://sear.host")
+//        sender.spigot().sendMessage(txt)
 
         return true
     }
