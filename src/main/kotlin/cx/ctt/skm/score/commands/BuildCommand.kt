@@ -52,7 +52,7 @@ class BuildCommand (private val plugin: Score): Listener, CommandExecutor {
     @EventHandler
     fun onBlockBreakEvent(event: BlockBreakEvent){
         if (event.player !in activated){
-            event.player.sendMessage("/build to break blocks")
+            event.player.sendMessage("/build to break/place blocks")
             event.isCancelled = true
         }
     }
