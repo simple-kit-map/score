@@ -18,7 +18,7 @@ class ItemPerks(private val plugin: Score): Listener, CommandExecutor, TabComple
         sender: CommandSender,
         command: Command,
         label: String,
-        args: Array<out String?>?
+        args: Array<out String>
     ): Boolean {
         TODO("Not yet implemented")
     }
@@ -27,8 +27,8 @@ class ItemPerks(private val plugin: Score): Listener, CommandExecutor, TabComple
         sender: CommandSender,
         command: Command,
         label: String,
-        args: Array<out String?>?
-    ): List<String?>? {
+        args: Array<out String>
+    ): List<String> {
         TODO("Not yet implemented")
     }
 }
