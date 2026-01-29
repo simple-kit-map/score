@@ -241,7 +241,6 @@ class WarpCommand(private val plugin: Score) : CommandExecutor, TabCompleter, Li
         return when (args.size) {
             // only show subwarps when a dot is typed
             1 -> warps.filter {
-                it.contains('.') && !last.contains('.')
                 if (it.contains('.') && !args[0].contains('.')) {
                     false
                 } else {
