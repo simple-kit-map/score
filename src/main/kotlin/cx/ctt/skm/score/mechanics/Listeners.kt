@@ -55,7 +55,7 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
 //    plugin.logger.info("shoo:${shooter.location.toString()}")
 //    plugin.logger.info("proj:${location.toString()}")
 
-    if (event.entityType == EntityType.POTION){
+    if (event.entityType == EntityType.SPLASH_POTION){
         val direction = shooter.location.direction.normalize()
         val projDirection = projectile.velocity
         val originalMagnitude = projDirection.length()
@@ -169,7 +169,7 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
             if (!currentWarp.containsKey(event.player.uniqueId)){
                 currentWarp[event.player.uniqueId] = 0
             }
-            val warps = WarpCommand.getWarpNamesRecursively(plugin.config.getConfigurationSection("warps")!!).sorted()
+            val warps = WarpCommand.getWarpNamesRecursively(plugin.config.getConfigurationSection("warps")!!).sorted().filter { !it.contains('.') }
 
             currentWarp[event.player.uniqueId] = if (event.player.isSneaking){
                 Random().nextInt(warps.size)
@@ -263,7 +263,6 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
         return ret
     }
 
-
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
 
@@ -339,12 +338,27 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
             Kit.loadKit(plugin, event.player, kit, label = "kit-s")
 
         val warpSect = plugin.config.getConfigurationSection("warps")!!
-        var warpName = ps.getString("warp")!!
+        val rawWarpName = ps.getString("warp")!!
         val warps = WarpCommand.getWarpNamesRecursively(warpSect)
 
-        val hasSubWarps = warps.any {it.startsWith("$warpName.") }
+        val cleanWarpName = if (rawWarpName.contains('.')) // strip subwarp
+            rawWarpName.split(".").first()
+        else rawWarpName
 
-        if (hasSubWarps || warpName.last().isDigit() && warpName.contains('.')){
+        val subWarps = warps.filter {
+            it.startsWith("$cleanWarpName.") &&
+            it != rawWarpName && it != cleanWarpName &&
+                    it.matches(Regex(".*\\.r[0-9]+$"))
+        }
+        if (subWarps.isNotEmpty())
+        {
+            val newWarp = subWarps.random()
+
+            val warpLoc = warpSect.getLocation("$newWarp.coords")!!
+            event.respawnLocation = warpLoc
+        }
+
+/*        if (hasSubWarps || warpName.last().isDigit() && warpName.contains('.')){
             var randomWarp = warpName
             for (char in randomWarp.toCharArray().reversed()){
                 randomWarp = randomWarp.removeSuffix(char.toString())
@@ -368,5 +382,6 @@ fun onProjectileLaunch(event: ProjectileLaunchEvent) {
         val warpLoc = warpSect.getLocation("$warpName.coords")!!
         ps.set("warp", warpName)
         event.respawnLocation = warpLoc
+        */
     }
 }
