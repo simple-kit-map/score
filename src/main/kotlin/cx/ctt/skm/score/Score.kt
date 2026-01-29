@@ -44,6 +44,8 @@ class Score : JavaPlugin() {
                 config.createSection(mainSection);
             }
         }
+        getCommand("setunbreakeable")?.setExecutor (setUnbreakable())
+
         val ip = ItemPerks(this)
         server.pluginManager.registerEvents(ItemPerks(this), this)
         getCommand("itemperks")?.setExecutor(ItemPerks(this))
@@ -72,6 +74,7 @@ class Score : JavaPlugin() {
         getCommand("ping")?.setExecutor(PingCommand(this))
         getCommand("accept")?.setExecutor(AcceptCommand(this))
         getCommand("cap")?.setExecutor(CapCommand(this))
+        getCommand("reload")?.setExecutor(ReloadConfigCommand(this))
 
         server.pluginManager.registerEvents(Listeners(this), this);
         server.pluginManager.registerEvents(DeathHandler(this), this)
