@@ -100,11 +100,16 @@ class MainMenu(private val plugin: Score) : Listener {
 
                 when (section.name) {
                     "mechanics" -> {
-                        val mechIcon = section.getItemStack("$el.icon") ?: ItemStack(Material.FILLED_MAP)
+                        val mechIcon: ItemStack = section.getItemStack("$el.icon") ?: ItemStack(Material.FILLED_MAP)
                         val meta = mechIcon.itemMeta!!
                         val lore = StringBuilder()
-                        val creatorId = UUID.fromString(section.getString("$el.creator")!!)
-                        val username = Bukkit.getPlayer(creatorId)?.name ?: Bukkit.getOfflinePlayer(creatorId).name ?: "Unknown?"
+                        val creatorId = section.getString("$el.creator")
+                        val username: String = if (creatorId != null) {
+                            Bukkit.getPlayer(UUID.fromString(creatorId))?.name
+                                ?: Bukkit.getOfflinePlayer(UUID.fromString(creatorId)).name ?: "Unknown?"
+                        } else {
+                            "Unknown?"
+                        }
                         lore.append("${LIGHT_PURPLE}by $DARK_PURPLE$username")
                         lore.append(KnockbackCommand.mechHover(section.getConfigurationSection(el)!!))
 
@@ -577,16 +582,16 @@ class MainMenu(private val plugin: Score) : Listener {
                 val (diff, newVal: Any) = when (type) {
                     is Double ->
                         when (e.click) {
-                            ClickType.LEFT -> Pair("${RED}-0.1", value.toBigDecimal().subtract(0.1.toBigDecimal()).toString().toDouble())
+                            ClickType.LEFT -> Pair("${RED}-0.01", value.toBigDecimal().subtract(0.01.toBigDecimal()).toString().toDouble())
                             ClickType.SHIFT_LEFT -> Pair(
-                                "${RED}-0.5",
-                                value.toBigDecimal().subtract(0.5.toBigDecimal()).toString().toDouble()
+                                "${RED}-0.1",
+                                value.toBigDecimal().subtract(0.1.toBigDecimal()).toString().toDouble()
                             )
 
-                            ClickType.RIGHT -> Pair("${GREEN}+0.1", value.toBigDecimal().add(0.1.toBigDecimal()).toString().toDouble())
+                            ClickType.RIGHT -> Pair("${GREEN}+0.01", value.toBigDecimal().add(0.01.toBigDecimal()).toString().toDouble())
                             ClickType.SHIFT_RIGHT -> Pair(
-                                "${GREEN}+0.5",
-                                value.toBigDecimal().add(0.5.toBigDecimal()).toString().toDouble()
+                                "${GREEN}+0.1",
+                                value.toBigDecimal().add(0.1.toBigDecimal()).toString().toDouble()
                             )
 
                             else -> return
