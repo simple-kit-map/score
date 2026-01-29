@@ -73,7 +73,7 @@ class Knockback(val plugin: Score): Listener {
         for ((key, info) in mechMeta){
            var value = mechSect[key] ?: info.defaultValue
             if (value != info.defaultValue && value::class != info.defaultValue::class) {
-                plugin.logger.info ("$mechName.$key: casting $value from ${value::class} to ${info.defaultValue::class.simpleName}")
+//                plugin.logger.info ("$mechName.$key: casting $value from ${value::class} to ${info.defaultValue::class.simpleName}")
                 value = castValue(mechSect[key].toString(), info.defaultValue, info.name, mechName)
             }
             fixedArray.add(value)
