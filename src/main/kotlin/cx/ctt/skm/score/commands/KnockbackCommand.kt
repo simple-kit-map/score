@@ -364,8 +364,11 @@ class KnockbackCommand(private val plugin: Score) : CommandExecutor, TabComplete
                 }
                 //! TODO: check type castable
                 val typedValue = castValue(value, mechMeta[key]!!.defaultValue, key, mechName)
-                sect.set(key, value)
-                sender.sendMessage("$label set $mechName.$key to $value")
+                sender.sendMessage("$label set $mechName.$key to ${typedValue.javaClass.simpleName}:$typedValue")
+                if (typedValue.javaClass != mechMeta.javaClass) {
+                    sender.sendMessage("$label $mechName does not support $key")
+                }
+                sect.set(key, typedValue)
 
             }
             // mech preview
