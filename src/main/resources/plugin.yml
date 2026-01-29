@@ -2,16 +2,22 @@ name: score
 version: '1.0-SNAPSHOT'
 main: cx.ctt.skm.score.Score
 api-version: '1.21'
-softdepend: [Essentials, PlayerKits2]
 author: [Couleur]
+loadbefore: [
+  CheatBreakerAPI
+]
 description: "a simple core for skm"
-libraries: ['org.jetbrains.kotlin:kotlin-stdlib:2.1.20',
-
-            'org.jetbrains.kotlin:kotlin-reflect:2.1.20'
+libraries: [
+  'org.jetbrains.kotlin:kotlin-stdlib:2.1.20',
+  'org.jetbrains.kotlin:kotlin-reflect:2.1.20'
 ]
 
 commands:
-
+    setunbreakable:
+      description: make held item unbreakeable
+    cap:
+      description: cheatbreaker api cap test
+      aliases: [cpscap]
     itemperks:
       description: change item abilities
       aliases: [ip]
@@ -47,3 +53,5 @@ commands:
     ping:
       description: get your latency
       aliases: [ms, latency]
+    reload:
+      description: reload config
