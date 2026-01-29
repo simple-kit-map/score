@@ -6,7 +6,7 @@ import org.bukkit.command.CommandSender
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 
-class setUnbreakable : CommandExecutor {
+class setUnbreakable() : CommandExecutor {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (sender !is Player) {
             return true
@@ -20,11 +20,13 @@ class setUnbreakable : CommandExecutor {
 
         if (args.isNotEmpty() && args.contains("armor")) {
             sender.inventory.armorContents.forEach {
-                val meta = it.itemMeta
-                meta!!.isUnbreakable = meta.isUnbreakable != true
+                val meta = it?.itemMeta
+                if (meta != null) {
+                    meta.isUnbreakable = meta.isUnbreakable != true
 
-                if (args.isNotEmpty() && args.contains("unbreaking")) meta.removeEnchant(Enchantment.UNBREAKING)
-                it.itemMeta = meta
+                    if (args.isNotEmpty() && args.contains("unbreaking")) meta.removeEnchant(Enchantment.UNBREAKING)
+                    it.itemMeta = meta
+                }
             }
         }
         return true
